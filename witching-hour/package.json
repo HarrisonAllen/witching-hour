@@ -1,0 +1,168 @@
+{
+  "name": "witching-hour",
+  "author": "Harrison Allen",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "witching-hour",
+    "uuid": "f46681cd-ea13-42fc-895d-a3dafba75f9c",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery"
+    ],
+    "capabilities": [
+      "configurable"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [
+      "dummy"
+    ],
+    "resources": {
+      "media": [
+        {
+          "characterRegex": "[0-9ADFJMNOSTWabcdeghilnoprtuvy ]",
+          "type": "font",
+          "name": "FONT_DATE_20",
+          "file": "fonts/ming.ttf",
+          "compatibility": "2.7"
+        },
+        {
+          "characterRegex": "[0-9:]",
+          "type": "font",
+          "name": "FONT_TIME_34",
+          "file": "fonts/ming.ttf",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_BROOM",
+          "file": "accessories/broom.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_UMBRELLA",
+          "file": "accessories/umbrella.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CAT_LOAFING",
+          "file": "cats/cat-loafing.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CAT_SITTING",
+          "file": "cats/cat-sitting.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CAT_SLEEPING",
+          "file": "cats/cat-sleeping.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CAT_STANDING",
+          "file": "cats/cat-standing.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_CHILLY_UMBRELLA",
+          "file": "witches/witch-chilly-umbrella.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_CHILLY",
+          "file": "witches/witch-chilly.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_COLD_UMBRELLA",
+          "file": "witches/witch-cold-umbrella.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_COLD",
+          "file": "witches/witch-cold.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_FREEZING_UMBRELLA",
+          "file": "witches/witch-freezing-umbrella.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_FREEZING",
+          "file": "witches/witch-freezing.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_HOT_UMBRELLA",
+          "file": "witches/witch-hot-umbrella.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_HOT",
+          "file": "witches/witch-hot.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_WARM_UMBRELLA",
+          "file": "witches/witch-warm-umbrella.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_WARM",
+          "file": "witches/witch-warm.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CLOUDS_FULL",
+          "file": "weather/clouds-full.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CLOUDS_PARTLY",
+          "file": "weather/clouds-partly.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_MOON",
+          "file": "weather/moon.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_PUMPKIN_MOON",
+          "file": "weather/pumpkin-moon.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_RAIN",
+          "file": "weather/rain.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_SNOW",
+          "file": "weather/snow.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_STARS",
+          "file": "weather/stars.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_STORM",
+          "file": "weather/storm.png"
+        }
+      ]
+    }
+  }
+}
