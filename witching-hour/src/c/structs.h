@@ -18,6 +18,7 @@ typedef struct ClaySettings {
   int TEMPERATURE;                   // Current temperature
   Weather CONDITIONS;                // Current weather conditions
   int MOON_FRACILLUM;              // Current moon visibility %
+  time_t last_weather_received;      // timestamp of last successful weather grab
   // General settings
   bool UseCurrentLocation;           // use GPS for weather?
   char Latitude[MAX_CHARS];          // latitude when not using GPS

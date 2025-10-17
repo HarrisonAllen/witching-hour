@@ -8,11 +8,13 @@
 static Window *s_main_window;
 // Layers
 static TextLayer *s_time_layer, *s_date_layer;
-static BitmapLayer *s_stars_layer, *s_moon_layer, *s_cloud_layer, *s_weather_layer, *s_broom_layer, *s_witch_layer, *s_cat_layer, *s_umbrella_layer;
+static BitmapLayer *s_stars_layer, *s_moon_layer, *s_cloud_layer, *s_weather_layer, *s_broom_layer, 
+        *s_body_layer, *s_witch_layer, *s_cat_layer, *s_umbrella_layer;
 // static Layer *s_moon_layer;
 // Resources
 static GFont s_time_font, s_date_font;
-static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitmap, *s_broom_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
+static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitmap, *s_broom_bitmap, 
+        *s_body_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
 // Globals
 static ClaySettings settings;
 
@@ -64,8 +66,7 @@ static void battery_callback(BatteryChargeState state) {
 }
 
 static void bluetooth_callback(bool connected) {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "%s witch", connected ? "showing" : "hiding");
-  layer_set_hidden(bitmap_layer_get_layer(s_witch_layer), !connected);
+  layer_set_hidden(bitmap_layer_get_layer(s_body_layer), !connected);
 
   if (!connected) {
     if (settings.VibrateOnDisc) {
@@ -81,6 +82,7 @@ static bool needs_umbrella() {
 }
 
 static void update_weather() {
+  uint32_t new_body_resource = RESOURCE_ID_IMAGE_WITCH_BODY_BASE;
   uint32_t new_witch_resource = RESOURCE_ID_IMAGE_WITCH_WARM;
   uint32_t new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
   uint32_t new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
@@ -88,6 +90,14 @@ static void update_weather() {
   uint32_t *witches = needs_umbrella() ? RAINY_WITCHES : SUNNY_WITCHES;
   layer_set_hidden(bitmap_layer_get_layer(s_umbrella_layer), !needs_umbrella());
 
+  // Conditions (body)
+  if (s_body_bitmap != NULL) {
+    gbitmap_destroy(s_body_bitmap);
+    s_body_bitmap = NULL;
+  }
+  s_body_bitmap = gbitmap_create_with_resource(needs_umbrella() ? RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA : RESOURCE_ID_IMAGE_WITCH_BODY_BASE);
+  bitmap_layer_set_bitmap(s_body_layer, s_body_bitmap);
+  
   // Temperature (witch)
   if (s_witch_bitmap != NULL) {
     gbitmap_destroy(s_witch_bitmap);
@@ -149,9 +159,11 @@ static void update_moon() {
 }
 
 static void default_settings() {  
-  settings.TEMPERATURE = 70;              // average temperature
-  settings.CONDITIONS = PARTLYCLOUDY;     // average weather
-  settings.MOON_FRACILLUM = -35;          // waning crescent
+  settings.TEMPERATURE = 80;              // placeholder temperature
+  settings.CONDITIONS = CLOUDY;           // placeholder weather
+  settings.MOON_FRACILLUM = -35;          // placeholder fracillum
+  settings.last_weather_received = 0;     // placeholder time
+
   settings.UseCurrentLocation = true;     // use GPS for weather
   settings.WeatherCheckRate = 15;         // check every 15 mins
   strcpy(settings.Latitude, "42.36");     // MIT latitude
@@ -159,7 +171,7 @@ static void default_settings() {
   settings.AmericanDate = true;           // Fri Oct 31 by default
   settings.VibrateOnDisc = true;          // vibrate by default
   
-  settings.TemperatureMetric = false;          // Celsius or Fahrenheit?
+  settings.TemperatureMetric = false;        // Celsius or Fahrenheit?
   settings.Temperature0 = 30;                // Freezing temperature
   settings.Temperature1 = 50;                // Cold temperature
   settings.Temperature2 = 65;                // Chilly temperature
@@ -223,6 +235,12 @@ static void main_window_load(Window *window) {
   bitmap_layer_set_bitmap(s_broom_layer, s_broom_bitmap);
   bitmap_layer_set_compositing_mode(s_broom_layer, GCompOpSet);
 
+  // Body: 67, 70
+  s_body_layer = bitmap_layer_create(GRect(67 + X_OFFSET, 70 + Y_OFFSET, 37, 47));
+  s_body_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA);
+  bitmap_layer_set_bitmap(s_body_layer, s_body_bitmap);
+  bitmap_layer_set_compositing_mode(s_body_layer, GCompOpSet);
+
   // Witch: 67, 70
   s_witch_layer = bitmap_layer_create(GRect(67 + X_OFFSET, 70 + Y_OFFSET, 37, 47));
   s_witch_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_WARM_UMBRELLA);
@@ -250,6 +268,7 @@ static void main_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_broom_layer));
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_body_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_witch_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_cat_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_umbrella_layer));

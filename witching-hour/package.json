@@ -79,6 +79,16 @@
         },
         {
           "type": "bitmap",
+          "name": "IMAGE_WITCH_BODY_BASE",
+          "file": "witches/witch-body-base.png"
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_WITCH_BODY_UMBRELLA",
+          "file": "witches/witch-body-umbrella.png"
+        },
+        {
+          "type": "bitmap",
           "name": "IMAGE_WITCH_CHILLY_UMBRELLA",
           "file": "witches/witch-chilly-umbrella.png"
         },
