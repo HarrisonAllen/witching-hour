@@ -193,16 +193,6 @@ static void draw_ellipse(GContext *ctx, GRect ellipse_bounds, bool include_edge)
 }
 
 static void moon_update_proc(Layer *layer, GContext *ctx) {
-  // Fracillum %s:
-  // < 5% -> new
-  // > 95% -> full
-  // waning: left side is white (-180 -> 0)
-  // waxing: right side is white (0 -> 180)
-  // waning: report negative %
-  // waxing: report positive %
-  // if % < 50: color = black else white
-  // frac width = % * bounds.width/2?
-  // if % > 50: width = (%-50) * bounds.width / 2
   GRect bounds = layer_get_bounds(layer);
   graphics_context_set_stroke_color(ctx, GColorWhite);
   draw_ellipse(ctx, bounds, false);
@@ -231,12 +221,15 @@ static void moon_update_proc(Layer *layer, GContext *ctx) {
 }
 
 static void update_moon() {
-  layer_mark_dirty(s_moon_layer);
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), !(tick_time->tm_mon == 9 && tick_time->tm_mday == 31));
+  layer_set_hidden(s_moon_layer, (tick_time->tm_mon == 9 && tick_time->tm_mday == 31));
 }
 
 static void default_settings() {  
   settings.TEMPERATURE = 80;              // placeholder temperature
-  settings.CONDITIONS = PARTLYCLOUDY;           // placeholder weather
+  settings.CONDITIONS = CLOUDY;           // placeholder weather
   settings.MOON_FRACILLUM = 30;          // placeholder fracillum
   settings.MOON_WANING = true;
   settings.last_weather_received = 0;     // placeholder time
@@ -276,15 +269,16 @@ static void main_window_load(Window *window) {
   s_weather_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_RAIN);
   bitmap_layer_set_bitmap(s_weather_layer, s_weather_bitmap);
   
-  // moon: 73, 19
+  // pumpkin moon: 73, 19
   s_moon_bm_layer = bitmap_layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, 34, 33));
-  s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_MOON);
+  s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PUMPKIN_MOON);
   bitmap_layer_set_bitmap(s_moon_bm_layer, s_moon_bitmap);
+  layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), true);
+
+  // real moon: 73, 19
   bitmap_layer_set_compositing_mode(s_moon_bm_layer, GCompOpSet);
-  // Real moon: TODO
   s_moon_layer = layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, MOON_SIZE, MOON_SIZE));
   layer_set_update_proc(s_moon_layer, moon_update_proc);
-  // s_battery_layer = layer_create(GRect(121 + X_OFFSET, 52 + Y_OFFSET, 22, 22));
 
   // clouds: 0, 0
   s_cloud_layer = bitmap_layer_create(GRect(0 + X_OFFSET, 0 + Y_OFFSET, 180, 57));
@@ -341,7 +335,7 @@ static void main_window_load(Window *window) {
 
   layer_add_child(window_layer, bitmap_layer_get_layer(s_stars_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_weather_layer));
-  // layer_add_child(window_layer, bitmap_layer_get_layer(s_moon_bm_layer));
+  layer_add_child(window_layer, bitmap_layer_get_layer(s_moon_bm_layer));
   layer_add_child(window_layer, s_moon_layer);
   layer_add_child(window_layer, bitmap_layer_get_layer(s_cloud_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
