@@ -1,4 +1,5 @@
 #include <pebble.h>
+#include "structs.h"
 
 #define Y_OFFSET (PBL_DISPLAY_HEIGHT - 180) / 2
 #define X_OFFSET (PBL_DISPLAY_WIDTH - 180) / 2
@@ -14,6 +15,29 @@ static GFont s_time_font, s_date_font;
 static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitmap, *s_broom_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
 // Globals
 
+// update the batter display layer
+static void battery_callback(BatteryChargeState state) {
+  uint32_t new_cat_resource = RESOURCE_ID_IMAGE_CAT_STANDING;
+
+  if (s_cat_bitmap != NULL) {
+    gbitmap_destroy(s_cat_bitmap);
+  }
+  if (state.is_charging) {
+    new_cat_resource = RESOURCE_ID_IMAGE_CAT_STRETCHING;
+  } else {
+    if (state.charge_percent >= 80) {
+      new_cat_resource = RESOURCE_ID_IMAGE_CAT_STANDING;
+    } else if (state.charge_percent >= 50) {
+      new_cat_resource = RESOURCE_ID_IMAGE_CAT_SITTING;
+    } else if (state.charge_percent >= 20) {
+      new_cat_resource = RESOURCE_ID_IMAGE_CAT_LOAFING;
+    } else {
+      new_cat_resource = RESOURCE_ID_IMAGE_CAT_SLEEPING;
+    }
+  }
+  s_cat_bitmap = gbitmap_create_with_resource(new_cat_resource);
+  bitmap_layer_set_bitmap(s_cat_layer, s_cat_bitmap);
+}
 
 // setup the display
 static void main_window_load(Window *window) {
@@ -264,10 +288,8 @@ static void init() {
   // struct tm *tick_time = localtime(&temp);
   // update_date(tick_time);
 
-  // // callback for battery level updates
-  // battery_state_service_subscribe(battery_callback);
-  // // display battery at the start
-  // battery_callback(battery_state_service_peek());
+  battery_state_service_subscribe(battery_callback);
+  battery_callback(battery_state_service_peek());
 
   // // callback for bluetooth connection updates
   // connection_service_subscribe((ConnectionHandlers) {

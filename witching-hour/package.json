@@ -74,6 +74,11 @@
         },
         {
           "type": "bitmap",
+          "name": "IMAGE_CAT_STRETCHING",
+          "file": "cats/cat-stretching.png"
+        },
+        {
+          "type": "bitmap",
           "name": "IMAGE_WITCH_CHILLY_UMBRELLA",
           "file": "witches/witch-chilly-umbrella.png"
         },
