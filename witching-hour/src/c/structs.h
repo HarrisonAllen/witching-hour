@@ -34,7 +34,7 @@ typedef struct ClaySettings {
   int Temperature4;                // Hot temperature
 } ClaySettings;
 
-static const uint32_t SUNNY_WITCHES[] = {
+static uint32_t SUNNY_WITCHES[] = {
   RESOURCE_ID_IMAGE_WITCH_FREEZING,
   RESOURCE_ID_IMAGE_WITCH_COLD,
   RESOURCE_ID_IMAGE_WITCH_CHILLY,
@@ -42,7 +42,7 @@ static const uint32_t SUNNY_WITCHES[] = {
   RESOURCE_ID_IMAGE_WITCH_HOT,
 };
 
-static const uint32_t RAINY_WITCHES[] = {
+static uint32_t RAINY_WITCHES[] = {
   RESOURCE_ID_IMAGE_WITCH_FREEZING_UMBRELLA,
   RESOURCE_ID_IMAGE_WITCH_COLD_UMBRELLA,
   RESOURCE_ID_IMAGE_WITCH_CHILLY_UMBRELLA,
@@ -50,7 +50,7 @@ static const uint32_t RAINY_WITCHES[] = {
   RESOURCE_ID_IMAGE_WITCH_HOT_UMBRELLA,
 };
 
-static const uint32_t CATS[] = {
+static uint32_t CATS[] = {
   RESOURCE_ID_IMAGE_CAT_STANDING,
   RESOURCE_ID_IMAGE_CAT_SITTING,
   RESOURCE_ID_IMAGE_CAT_LOAFING,

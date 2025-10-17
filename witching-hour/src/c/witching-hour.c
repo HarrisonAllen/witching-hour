@@ -44,6 +44,7 @@ static void battery_callback(BatteryChargeState state) {
 
   if (s_cat_bitmap != NULL) {
     gbitmap_destroy(s_cat_bitmap);
+    s_cat_bitmap = NULL;
   }
   if (state.is_charging) {
     new_cat_resource = RESOURCE_ID_IMAGE_CAT_STRETCHING;
@@ -71,6 +72,80 @@ static void bluetooth_callback(bool connected) {
       vibes_double_pulse();
     }
   }
+}
+
+static bool needs_umbrella() {
+  return settings.CONDITIONS == RAINY
+         || settings.CONDITIONS == SNOWY
+         || settings.CONDITIONS == STORMY;
+}
+
+static void update_weather() {
+  uint32_t new_witch_resource = RESOURCE_ID_IMAGE_WITCH_WARM;
+  uint32_t new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
+  uint32_t new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
+
+  uint32_t *witches = needs_umbrella() ? RAINY_WITCHES : SUNNY_WITCHES;
+  layer_set_hidden(bitmap_layer_get_layer(s_umbrella_layer), !needs_umbrella());
+
+  // Temperature (witch)
+  if (s_witch_bitmap != NULL) {
+    gbitmap_destroy(s_witch_bitmap);
+    s_witch_bitmap = NULL;
+  }
+  if (settings.TEMPERATURE >= settings.Temperature4) {
+    new_witch_resource = witches[4];
+  } else if (settings.TEMPERATURE >= settings.Temperature3) {
+    new_witch_resource = witches[3];
+  } else if (settings.TEMPERATURE >= settings.Temperature2) {
+    new_witch_resource = witches[2];
+  } else if (settings.TEMPERATURE >= settings.Temperature1) {
+    new_witch_resource = witches[1];
+  } else {
+    new_witch_resource = witches[0];
+  }
+  s_witch_bitmap = gbitmap_create_with_resource(new_witch_resource);
+  bitmap_layer_set_bitmap(s_witch_layer, s_witch_bitmap);
+
+  // Conditions (background)
+  if (s_weather_bitmap != NULL) {
+    gbitmap_destroy(s_weather_bitmap);
+    s_weather_bitmap = NULL;
+  }
+  if (needs_umbrella()) {
+    if (settings.CONDITIONS == RAINY) {
+      new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
+    } else if (settings.CONDITIONS == SNOWY) {
+      new_weather_resource = RESOURCE_ID_IMAGE_SNOW;
+    } else if (settings.CONDITIONS == STORMY) {
+      new_weather_resource = RESOURCE_ID_IMAGE_STORM;
+    }
+    s_weather_bitmap = gbitmap_create_with_resource(new_weather_resource);
+    bitmap_layer_set_bitmap(s_weather_layer, s_weather_bitmap);
+  } else {
+    layer_set_hidden(bitmap_layer_get_layer(s_weather_layer), true);
+  }
+
+  // Conditions (cloud)
+  if (s_cloud_bitmap != NULL) {
+    gbitmap_destroy(s_cloud_bitmap);
+    s_cloud_bitmap = NULL;
+  }
+  if (settings.CONDITIONS != SUNNY) {
+    if (settings.CONDITIONS == PARTLYCLOUDY) {
+      new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
+    } else {
+      new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_FULL;
+    }
+    s_cloud_bitmap = gbitmap_create_with_resource(new_cloud_resource);
+    bitmap_layer_set_bitmap(s_cloud_layer, s_cloud_bitmap);
+  } else {
+    layer_set_hidden(bitmap_layer_get_layer(s_cloud_layer), true);
+  }
+}
+
+static void update_moon() {
+
 }
 
 static void default_settings() {  
@@ -336,6 +411,7 @@ static void init() {
 
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   update_time();
+  update_weather();
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
