@@ -14,6 +14,29 @@ static BitmapLayer *s_stars_layer, *s_moon_layer, *s_cloud_layer, *s_weather_lay
 static GFont s_time_font, s_date_font;
 static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitmap, *s_broom_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
 // Globals
+static ClaySettings settings;
+
+static void update_time() {
+  static char s_time_buffer[8];
+  static char s_date_buffer[12];
+
+  time_t temp = time(NULL);
+  struct tm *tick_time = localtime(&temp);
+  
+  strftime(s_time_buffer, sizeof(s_time_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
+  if (settings.AmericanDate) {
+    strftime(s_date_buffer, sizeof(s_date_buffer), "%a %b %d", tick_time);
+  } else {
+    strftime(s_date_buffer, sizeof(s_date_buffer), "%a %d %b", tick_time);
+  }
+
+  text_layer_set_text(s_time_layer, s_time_buffer);
+  text_layer_set_text(s_date_layer, s_date_buffer);
+}
+
+static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
+  update_time();
+}
 
 // update the batter display layer
 static void battery_callback(BatteryChargeState state) {
@@ -37,6 +60,41 @@ static void battery_callback(BatteryChargeState state) {
   }
   s_cat_bitmap = gbitmap_create_with_resource(new_cat_resource);
   bitmap_layer_set_bitmap(s_cat_layer, s_cat_bitmap);
+}
+
+static void bluetooth_callback(bool connected) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "%s witch", connected ? "showing" : "hiding");
+  layer_set_hidden(bitmap_layer_get_layer(s_witch_layer), !connected);
+
+  if (!connected) {
+    if (settings.VibrateOnDisc) {
+      vibes_double_pulse();
+    }
+  }
+}
+
+static void default_settings() {  
+  settings.TEMPERATURE = 70;              // average temperature
+  settings.CONDITIONS = PARTLYCLOUDY;     // average weather
+  settings.MOON_FRACILLUM = -35;          // waning crescent
+  settings.UseCurrentLocation = true;     // use GPS for weather
+  settings.WeatherCheckRate = 15;         // check every 15 mins
+  strcpy(settings.Latitude, "42.36");     // MIT latitude
+  strcpy(settings.Latitude, "-71.1");     // MIT longitude
+  settings.AmericanDate = true;           // Fri Oct 31 by default
+  settings.VibrateOnDisc = true;          // vibrate by default
+  
+  settings.TemperatureMetric = false;          // Celsius or Fahrenheit?
+  settings.Temperature0 = 30;                // Freezing temperature
+  settings.Temperature1 = 50;                // Cold temperature
+  settings.Temperature2 = 65;                // Chilly temperature
+  settings.Temperature3 = 75;                // Warm temperature
+  settings.Temperature4 = 90;                // Hot temperature
+}
+
+static void load_settings() {
+  default_settings();
+  // persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
 
 // setup the display
@@ -120,10 +178,6 @@ static void main_window_load(Window *window) {
   layer_add_child(window_layer, bitmap_layer_get_layer(s_witch_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_cat_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_umbrella_layer));
-
-  // TODO: remove
-  text_layer_set_text(s_time_layer, "22:45");
-  text_layer_set_text(s_date_layer, "Mon Oct 13");
 }
 
 // unload everything!
@@ -266,7 +320,7 @@ static void main_window_unload(Window *window) {
 // }
 
 static void init() {
-  // load_settings();
+  load_settings();
 
   // setup window
   s_main_window = window_create();
@@ -280,16 +334,15 @@ static void init() {
 
   window_stack_push(s_main_window, true);
 
-  // // set up tick_handler to run every minute
-  // tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
-  // // want to display time and date at the start
-  // update_time();
-  // time_t temp = time(NULL);
-  // struct tm *tick_time = localtime(&temp);
-  // update_date(tick_time);
+  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+  update_time();
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
+
+  connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = bluetooth_callback
+  });
 
   // // callback for bluetooth connection updates
   // connection_service_subscribe((ConnectionHandlers) {

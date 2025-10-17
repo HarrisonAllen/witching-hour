@@ -17,21 +17,21 @@ typedef struct ClaySettings {
   // Relatime Data
   int TEMPERATURE;                   // Current temperature
   Weather CONDITIONS;                // Current weather conditions
-  float MOON_FRACILLUM;              // Current moon visibility %
+  int MOON_FRACILLUM;              // Current moon visibility %
   // General settings
   bool UseCurrentLocation;           // use GPS for weather?
   char Latitude[MAX_CHARS];          // latitude when not using GPS
   char Longitude[MAX_CHARS];         // longitude when not using GPS
   int WeatherCheckRate;              // how often to check weather
-  bool AmericanDate;                 // use American date format (Jan 01)?
+  bool AmericanDate;                 // use American date format (Fri Oct 31)?
   bool VibrateOnDisc;                // vibrate on bluetooth disconnect?
   // Temperature Settings
   bool TemperatureMetric;          // Celsius or Fahrenheit?
-  int Temperature0;                // Coldest temperature
+  int Temperature0;                // Freezing temperature
   int Temperature1;                // Cold temperature
-  int Temperature2;                // Comfortable temperature
-  int Temperature3;                // Hot temperature
-  int Temperature4;                // Hottest temperature
+  int Temperature2;                // Chilly temperature
+  int Temperature3;                // Warm temperature
+  int Temperature4;                // Hot temperature
 } ClaySettings;
 
 static const uint32_t SUNNY_WITCHES[] = {
