@@ -16,6 +16,17 @@ static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitm
 // Globals
 static ClaySettings settings;
 
+static void temp_update_moon(time_t temp) {
+  if (((temp / 20) % 2) == 1) {
+    settings.MOON_FRACILLUM = 100-(temp % 20) * 5;
+    settings.MOON_WANING = true;
+  } else {
+    settings.MOON_FRACILLUM = (temp % 20) * 5;
+    settings.MOON_WANING = false;
+  }
+  layer_mark_dirty(s_moon_layer);
+}
+
 static void update_time() {
   static char s_time_buffer[8];
   static char s_date_buffer[12];
@@ -29,6 +40,9 @@ static void update_time() {
   } else {
     strftime(s_date_buffer, sizeof(s_date_buffer), "%a %d %b", tick_time);
   }
+
+  // temp_update_moon(temp);
+  // snprintf(s_time_buffer, sizeof(s_time_buffer), "%d:%d", settings.MOON_FRACILLUM, settings.MOON_WANING ? 1 : 0);
 
   text_layer_set_text(s_time_layer, s_time_buffer);
   text_layer_set_text(s_date_layer, s_date_buffer);
@@ -156,18 +170,22 @@ static float squared(float x) {
   return x*x;
 }
 
-static bool is_in_ellipse(GRect ellipse_bounds, GPoint point) {
+static bool is_in_ellipse(GRect ellipse_bounds, GPoint point, bool include_edge) {
   GPoint center = GPoint(ellipse_bounds.origin.x + ellipse_bounds.size.w / 2, ellipse_bounds.origin.y + ellipse_bounds.size.h / 2);
   float calculated = (squared(point.x - center.x) / squared(ellipse_bounds.size.w / 2))
                      + (squared(point.y - center.y) / squared(ellipse_bounds.size.h / 2));
-  return calculated <= 1;
+  if (include_edge) {
+    return calculated <= 1;
+  } else {
+    return calculated < 1;
+  }
 }
 
-static void draw_ellipse(GContext *ctx, GRect ellipse_bounds) {
+static void draw_ellipse(GContext *ctx, GRect ellipse_bounds, bool include_edge) {
   int x, y;
   for (x = ellipse_bounds.origin.x; x < ellipse_bounds.origin.x + ellipse_bounds.size.w; x++) {
     for (y = ellipse_bounds.origin.y; y < ellipse_bounds.origin.y + ellipse_bounds.size.h; y++) {
-      if (is_in_ellipse(ellipse_bounds, GPoint(x, y))) {
+      if (is_in_ellipse(ellipse_bounds, GPoint(x, y), include_edge)) {
         graphics_draw_pixel(ctx, GPoint(x, y));
       }
     }
@@ -187,14 +205,29 @@ static void moon_update_proc(Layer *layer, GContext *ctx) {
   // if % > 50: width = (%-50) * bounds.width / 2
   GRect bounds = layer_get_bounds(layer);
   graphics_context_set_stroke_color(ctx, GColorWhite);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_radial(ctx, bounds, GOvalScaleModeFitCircle, bounds.size.h, DEG_TO_TRIGANGLE(-180), DEG_TO_TRIGANGLE(0));
+  draw_ellipse(ctx, bounds, false);
+  graphics_context_set_fill_color(ctx, GColorBlack);
+  if (settings.MOON_WANING) {
+    graphics_fill_rect(ctx, GRect(bounds.origin.x + bounds.size.w / 2, bounds.origin.y, bounds.size.w / 2, bounds.size.h), 0, GCornerNone);
+  } else {
+    graphics_fill_rect(ctx, GRect(bounds.origin.x, bounds.origin.y, bounds.size.w / 2, bounds.size.h), 0, GCornerNone);
+  }
 
   GPoint center = GPoint(bounds.origin.x + (bounds.size.w / 2), bounds.origin.y + (bounds.size.h / 2));
-  int fracillum_width = 9;
+  int fracillum_width;
+  if (settings.MOON_FRACILLUM > 50) {
+    graphics_context_set_stroke_color(ctx, GColorWhite);
+    fracillum_width = ((settings.MOON_FRACILLUM - 50) / 50.0) * (bounds.size.w / 2 + 3);
+  } else {
+    graphics_context_set_stroke_color(ctx, GColorBlack);
+    fracillum_width = (1 - (settings.MOON_FRACILLUM / 50.0)) * (bounds.size.w / 2 + 3);
+  }
+  if (fracillum_width > FRACILLUM_MAX_WIDTH) {
+    fracillum_width = bounds.size.w / 2;
+  }
   GRect fracillum_bounds = GRect(center.x - fracillum_width, bounds.origin.y, fracillum_width * 2, bounds.size.h);
-  graphics_context_set_stroke_color(ctx, GColorWhite);
-  draw_ellipse(ctx, fracillum_bounds);
+  
+  draw_ellipse(ctx, fracillum_bounds, false);
 }
 
 static void update_moon() {
@@ -203,8 +236,9 @@ static void update_moon() {
 
 static void default_settings() {  
   settings.TEMPERATURE = 80;              // placeholder temperature
-  settings.CONDITIONS = SUNNY;           // placeholder weather
-  settings.MOON_FRACILLUM = -35;          // placeholder fracillum
+  settings.CONDITIONS = PARTLYCLOUDY;           // placeholder weather
+  settings.MOON_FRACILLUM = 30;          // placeholder fracillum
+  settings.MOON_WANING = true;
   settings.last_weather_received = 0;     // placeholder time
 
   settings.UseCurrentLocation = true;     // use GPS for weather
