@@ -1,16 +1,14 @@
 #include <pebble.h>
 #include "structs.h"
-
-#define Y_OFFSET (PBL_DISPLAY_HEIGHT - 180) / 2
-#define X_OFFSET (PBL_DISPLAY_WIDTH - 180) / 2
+#include "defines.h"
 
 // Window
 static Window *s_main_window;
 // Layers
 static TextLayer *s_time_layer, *s_date_layer;
-static BitmapLayer *s_stars_layer, *s_moon_layer, *s_cloud_layer, *s_weather_layer, *s_broom_layer, 
+static BitmapLayer *s_stars_layer, *s_moon_bm_layer, *s_cloud_layer, *s_weather_layer, *s_broom_layer, 
         *s_body_layer, *s_witch_layer, *s_cat_layer, *s_umbrella_layer;
-// static Layer *s_moon_layer;
+static Layer *s_moon_layer;
 // Resources
 static GFont s_time_font, s_date_font;
 static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitmap, *s_broom_bitmap, 
@@ -154,13 +152,58 @@ static void update_weather() {
   }
 }
 
-static void update_moon() {
+static float squared(float x) {
+  return x*x;
+}
 
+static bool is_in_ellipse(GRect ellipse_bounds, GPoint point) {
+  GPoint center = GPoint(ellipse_bounds.origin.x + ellipse_bounds.size.w / 2, ellipse_bounds.origin.y + ellipse_bounds.size.h / 2);
+  float calculated = (squared(point.x - center.x) / squared(ellipse_bounds.size.w / 2))
+                     + (squared(point.y - center.y) / squared(ellipse_bounds.size.h / 2));
+  return calculated <= 1;
+}
+
+static void draw_ellipse(GContext *ctx, GRect ellipse_bounds) {
+  int x, y;
+  for (x = ellipse_bounds.origin.x; x < ellipse_bounds.origin.x + ellipse_bounds.size.w; x++) {
+    for (y = ellipse_bounds.origin.y; y < ellipse_bounds.origin.y + ellipse_bounds.size.h; y++) {
+      if (is_in_ellipse(ellipse_bounds, GPoint(x, y))) {
+        graphics_draw_pixel(ctx, GPoint(x, y));
+      }
+    }
+  }
+}
+
+static void moon_update_proc(Layer *layer, GContext *ctx) {
+  // Fracillum %s:
+  // < 5% -> new
+  // > 95% -> full
+  // waning: left side is white (-180 -> 0)
+  // waxing: right side is white (0 -> 180)
+  // waning: report negative %
+  // waxing: report positive %
+  // if % < 50: color = black else white
+  // frac width = % * bounds.width/2?
+  // if % > 50: width = (%-50) * bounds.width / 2
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_radial(ctx, bounds, GOvalScaleModeFitCircle, bounds.size.h, DEG_TO_TRIGANGLE(-180), DEG_TO_TRIGANGLE(0));
+
+  GPoint center = GPoint(bounds.origin.x + (bounds.size.w / 2), bounds.origin.y + (bounds.size.h / 2));
+  int fracillum_width = 9;
+  GRect fracillum_bounds = GRect(center.x - fracillum_width, bounds.origin.y, fracillum_width * 2, bounds.size.h);
+  graphics_context_set_stroke_color(ctx, GColorWhite);
+  draw_ellipse(ctx, fracillum_bounds);
+}
+
+static void update_moon() {
+  layer_mark_dirty(s_moon_layer);
 }
 
 static void default_settings() {  
   settings.TEMPERATURE = 80;              // placeholder temperature
-  settings.CONDITIONS = CLOUDY;           // placeholder weather
+  settings.CONDITIONS = SUNNY;           // placeholder weather
   settings.MOON_FRACILLUM = -35;          // placeholder fracillum
   settings.last_weather_received = 0;     // placeholder time
 
@@ -200,11 +243,13 @@ static void main_window_load(Window *window) {
   bitmap_layer_set_bitmap(s_weather_layer, s_weather_bitmap);
   
   // moon: 73, 19
-  s_moon_layer = bitmap_layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, 34, 33));
+  s_moon_bm_layer = bitmap_layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, 34, 33));
   s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_MOON);
-  bitmap_layer_set_bitmap(s_moon_layer, s_moon_bitmap);
-  bitmap_layer_set_compositing_mode(s_moon_layer, GCompOpSet);
+  bitmap_layer_set_bitmap(s_moon_bm_layer, s_moon_bitmap);
+  bitmap_layer_set_compositing_mode(s_moon_bm_layer, GCompOpSet);
   // Real moon: TODO
+  s_moon_layer = layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, MOON_SIZE, MOON_SIZE));
+  layer_set_update_proc(s_moon_layer, moon_update_proc);
   // s_battery_layer = layer_create(GRect(121 + X_OFFSET, 52 + Y_OFFSET, 22, 22));
 
   // clouds: 0, 0
@@ -262,8 +307,8 @@ static void main_window_load(Window *window) {
 
   layer_add_child(window_layer, bitmap_layer_get_layer(s_stars_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_weather_layer));
-  layer_add_child(window_layer, bitmap_layer_get_layer(s_moon_layer));
-  // layer_add_child(window_layer, s_moon_layer);
+  // layer_add_child(window_layer, bitmap_layer_get_layer(s_moon_bm_layer));
+  layer_add_child(window_layer, s_moon_layer);
   layer_add_child(window_layer, bitmap_layer_get_layer(s_cloud_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
   layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
@@ -277,8 +322,8 @@ static void main_window_load(Window *window) {
 // unload everything!
 static void main_window_unload(Window *window) {
   // unload regular layers
-  // if (s_moon_layer != NULL)
-  //   layer_destroy(s_moon_layer);
+  if (s_moon_layer != NULL)
+    layer_destroy(s_moon_layer);
 
   // unload text layers
   if (s_time_layer != NULL)
@@ -295,8 +340,8 @@ static void main_window_unload(Window *window) {
   // unload bitmap layers
   if (s_stars_layer != NULL)
     bitmap_layer_destroy(s_stars_layer);
-  if (s_moon_layer != NULL)
-    bitmap_layer_destroy(s_moon_layer);
+  if (s_moon_bm_layer != NULL)
+    bitmap_layer_destroy(s_moon_bm_layer);
   if (s_cloud_layer != NULL)
     bitmap_layer_destroy(s_cloud_layer);
   if (s_weather_layer != NULL)
@@ -431,6 +476,7 @@ static void init() {
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   update_time();
   update_weather();
+  update_moon();
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());

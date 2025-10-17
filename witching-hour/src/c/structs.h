@@ -1,4 +1,5 @@
 #include <pebble.h>
+#pragma once
 
 #define MAX_CHARS 40
 
