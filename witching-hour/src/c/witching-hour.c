@@ -1,6 +1,7 @@
 #include <pebble.h>
 #include "structs.h"
 #include "defines.h"
+#include "helpers.h"
 
 // Window
 static Window *s_main_window;
@@ -15,6 +16,11 @@ static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitm
         *s_body_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
 // Globals
 static ClaySettings settings;
+static int16_t fly_offset_x;
+static int fly_start_x;
+static int16_t float_offset_y;
+static int float_start_y, float_end_y;
+static int frames[FLOAT_COUNTS + 1];
 
 static void temp_update_moon(time_t temp) {
   if (((temp / 20) % 2) == 1) {
@@ -166,10 +172,6 @@ static void update_weather() {
   }
 }
 
-static float squared(float x) {
-  return x*x;
-}
-
 static bool is_in_ellipse(GRect ellipse_bounds, GPoint point, bool include_edge) {
   GPoint center = GPoint(ellipse_bounds.origin.x + ellipse_bounds.size.w / 2, ellipse_bounds.origin.y + ellipse_bounds.size.h / 2);
   float calculated = (squared(point.x - center.x) / squared(ellipse_bounds.size.w / 2))
@@ -227,9 +229,141 @@ static void update_moon() {
   layer_set_hidden(s_moon_layer, (tick_time->tm_mon == 9 && tick_time->tm_mday == 31));
 }
 
+static void set_witch_group_member_position(BitmapLayer *layer, int base_x, int base_y) {
+  GRect og_bounds, new_bounds;
+  og_bounds = layer_get_bounds(bitmap_layer_get_layer(layer));
+  new_bounds = GRect(base_x + X_OFFSET + fly_offset_x, base_y + Y_OFFSET + float_offset_y, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(bitmap_layer_get_layer(layer), new_bounds);
+}
+
+static void set_witch_group_position() {
+  set_witch_group_member_position(s_broom_layer, BROOM_X, BROOM_Y);
+  set_witch_group_member_position(s_body_layer, BODY_X, BODY_Y);
+  set_witch_group_member_position(s_witch_layer, WITCH_X, WITCH_Y);
+  set_witch_group_member_position(s_cat_layer, CAT_X, CAT_Y);
+  set_witch_group_member_position(s_umbrella_layer, UMBRELLA_X, UMBRELLA_Y);
+}
+
+static void anim_setup(Animation *animation) {
+
+}
+
+static void anim_update(Animation *animation, const AnimationProgress progress) {
+  float_offset_y = lerp(float_start_y, float_end_y, ((float)progress) / ANIMATION_NORMALIZED_MAX);
+  fly_offset_x = lerp(fly_start_x, 0, ((float)progress) / ANIMATION_NORMALIZED_MAX);
+  set_witch_group_position();
+}
+
+static void anim_teardown(Animation *animation) {
+
+}
+
+static void fly_anim_started_handler(Animation *animation, void *context) {
+  fly_offset_x = FLY_START_X;
+  fly_start_x = FLY_START_X;
+  float_start_y = 0;
+  float_end_y = -(FLOAT_DISTANCE / 2);
+  float_offset_y = float_start_y;
+  set_witch_group_position();
+}
+
+static void fly_anim_stopped_handler(Animation *animation, bool finished, void *context) {
+  fly_offset_x = 0;
+  fly_start_x = 0;
+  set_witch_group_position();
+}
+
+static Animation * create_fly_animation() {
+  Animation *animation = animation_create();
+  animation_set_curve(animation, AnimationCurveEaseOut);
+  animation_set_duration(animation, FLY_ANIMATION_DURATION);
+  animation_set_delay(animation, 500);
+
+  const AnimationImplementation implementation = {
+    .setup = anim_setup,
+    .update = anim_update,
+    .teardown = anim_teardown
+  };
+  animation_set_implementation(animation, &implementation);
+  animation_set_handlers(animation, (AnimationHandlers) {
+    .started = fly_anim_started_handler,
+    .stopped = fly_anim_stopped_handler
+  }, NULL);
+  
+  return animation;
+}
+static void float_anim_started_handler(Animation *animation, void *context) {
+  int float_frame = *((int *)(context));
+  if (float_frame == 0) {
+    float_start_y = 0;
+    float_end_y = -(FLOAT_DISTANCE / 2);
+    float_offset_y = float_start_y;
+  } else if (float_frame == FLOAT_COUNTS - 1) {
+    float_start_y = (FLOAT_DISTANCE / 2);
+    float_end_y = 0;
+    float_offset_y = float_start_y;
+  } else if (float_frame % 2 == 1) {
+    float_start_y = -(FLOAT_DISTANCE / 2);
+    float_end_y = (FLOAT_DISTANCE / 2);
+    float_offset_y = float_start_y;
+  } else if (float_frame % 2 == 0) {
+    float_start_y = (FLOAT_DISTANCE / 2);
+    float_end_y = -(FLOAT_DISTANCE / 2);
+    float_offset_y = float_start_y;
+  }
+  set_witch_group_position();
+}
+
+static void float_anim_stopped_handler(Animation *animation, bool finished, void *context) {
+  float_offset_y = float_end_y;
+  set_witch_group_position();
+}
+
+static Animation * create_float_animation(int float_frame) {
+  Animation *animation = animation_create();
+  animation_set_curve(animation, AnimationCurveEaseInOut);
+  animation_set_duration(animation, FLOAT_ANIMATION_DURATION);
+  animation_set_delay(animation, 200);
+
+  const AnimationImplementation implementation = {
+    .setup = anim_setup,
+    .update = anim_update,
+    .teardown = anim_teardown
+  };
+  animation_set_implementation(animation, &implementation);
+  animation_set_handlers(animation, (AnimationHandlers) {
+    .started = float_anim_started_handler,
+    .stopped = float_anim_stopped_handler
+  }, &frames[float_frame]);
+
+  return animation;
+}
+
+static void start_animation() {
+  for (int i = 0; i < FLOAT_COUNTS; i++) {
+    frames[i] = i+1;
+  }
+
+  Animation **arr = (Animation**)malloc((FLOAT_COUNTS + 1) * sizeof(Animation*));
+  arr[0] = create_fly_animation();
+  for (int i = 1; i < FLOAT_COUNTS; i++) {
+    arr[i] = create_float_animation(i-1);
+  }
+  float_start_y = 0;
+  float_end_y = 0;
+  float_offset_y = 0;
+
+  Animation *sequence = animation_sequence_create_from_array(arr, (FLOAT_COUNTS + 1));
+  animation_set_play_count(sequence, 1);
+
+  animation_schedule(sequence);
+
+  free(arr);
+}
+
 static void default_settings() {  
   settings.TEMPERATURE = 80;              // placeholder temperature
-  settings.CONDITIONS = CLOUDY;           // placeholder weather
+  settings.CONDITIONS = RAINY;           // placeholder weather
   settings.MOON_FRACILLUM = 30;          // placeholder fracillum
   settings.MOON_WANING = true;
   settings.last_weather_received = 0;     // placeholder time
@@ -260,34 +394,34 @@ static void main_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_layer);
   
   // stars: 0, 0
-  s_stars_layer = bitmap_layer_create(GRect(0 + X_OFFSET, 0 + Y_OFFSET, 180, 57));
+  s_stars_layer = bitmap_layer_create(GRect(STARS_X + X_OFFSET, STARS_Y + Y_OFFSET, 180, 57));
   s_stars_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_STARS);
   bitmap_layer_set_bitmap(s_stars_layer, s_stars_bitmap);
   
   // weather: 0, 48
-  s_weather_layer = bitmap_layer_create(GRect(0 + X_OFFSET, 48 + Y_OFFSET, 180, 132));
+  s_weather_layer = bitmap_layer_create(GRect(WEATHER_X + X_OFFSET, WEATHER_Y + Y_OFFSET, 180, 132));
   s_weather_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_RAIN);
   bitmap_layer_set_bitmap(s_weather_layer, s_weather_bitmap);
   
   // pumpkin moon: 73, 19
-  s_moon_bm_layer = bitmap_layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, 34, 33));
+  s_moon_bm_layer = bitmap_layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, 34, 33));
   s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PUMPKIN_MOON);
   bitmap_layer_set_bitmap(s_moon_bm_layer, s_moon_bitmap);
   layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), true);
 
   // real moon: 73, 19
   bitmap_layer_set_compositing_mode(s_moon_bm_layer, GCompOpSet);
-  s_moon_layer = layer_create(GRect(73 + X_OFFSET, 19 + Y_OFFSET, MOON_SIZE, MOON_SIZE));
+  s_moon_layer = layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, MOON_SIZE, MOON_SIZE));
   layer_set_update_proc(s_moon_layer, moon_update_proc);
 
   // clouds: 0, 0
-  s_cloud_layer = bitmap_layer_create(GRect(0 + X_OFFSET, 0 + Y_OFFSET, 180, 57));
+  s_cloud_layer = bitmap_layer_create(GRect(CLOUDS_X + X_OFFSET, CLOUDS_Y + Y_OFFSET, 180, 57));
   s_cloud_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_CLOUDS_FULL);
   bitmap_layer_set_bitmap(s_cloud_layer, s_cloud_bitmap);
   bitmap_layer_set_compositing_mode(s_cloud_layer, GCompOpSet);
 
   // time: x, 108 ish
-  s_time_layer = text_layer_create(GRect(0, 108 + Y_OFFSET, bounds.size.w, 38));
+  s_time_layer = text_layer_create(GRect(TIME_X, TIME_Y + Y_OFFSET, bounds.size.w, 38));
   s_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_TIME_34));
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, GColorWhite);
@@ -295,7 +429,7 @@ static void main_window_load(Window *window) {
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
   
   // date: x, 144 ish
-  s_date_layer = text_layer_create(GRect(0, 144 + Y_OFFSET, bounds.size.w, 24));
+  s_date_layer = text_layer_create(GRect(DATE_X, DATE_Y + Y_OFFSET, bounds.size.w, 24));
   s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_20));
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorWhite);
@@ -303,31 +437,31 @@ static void main_window_load(Window *window) {
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   
   // broom: 50, 66
-  s_broom_layer = bitmap_layer_create(GRect(50 + X_OFFSET, 66 + Y_OFFSET, 81, 52));
+  s_broom_layer = bitmap_layer_create(GRect(FLY_START_X + BROOM_X + X_OFFSET, BROOM_Y + Y_OFFSET, 81, 52));
   s_broom_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BROOM);
   bitmap_layer_set_bitmap(s_broom_layer, s_broom_bitmap);
   bitmap_layer_set_compositing_mode(s_broom_layer, GCompOpSet);
 
   // Body: 67, 70
-  s_body_layer = bitmap_layer_create(GRect(67 + X_OFFSET, 70 + Y_OFFSET, 37, 47));
+  s_body_layer = bitmap_layer_create(GRect(FLY_START_X + BODY_X + X_OFFSET, BODY_Y + Y_OFFSET, 37, 47));
   s_body_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA);
   bitmap_layer_set_bitmap(s_body_layer, s_body_bitmap);
   bitmap_layer_set_compositing_mode(s_body_layer, GCompOpSet);
 
   // Witch: 67, 70
-  s_witch_layer = bitmap_layer_create(GRect(67 + X_OFFSET, 70 + Y_OFFSET, 37, 47));
+  s_witch_layer = bitmap_layer_create(GRect(FLY_START_X + WITCH_X + X_OFFSET, WITCH_Y + Y_OFFSET, 37, 47));
   s_witch_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_WARM_UMBRELLA);
   bitmap_layer_set_bitmap(s_witch_layer, s_witch_bitmap);
   bitmap_layer_set_compositing_mode(s_witch_layer, GCompOpSet);
   
   // Cat: 102, 89
-  s_cat_layer = bitmap_layer_create(GRect(102 + X_OFFSET, 89 + Y_OFFSET, 22, 14));
+  s_cat_layer = bitmap_layer_create(GRect(FLY_START_X + CAT_X + X_OFFSET, CAT_Y + Y_OFFSET, 22, 14));
   s_cat_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_CAT_LOAFING);
   bitmap_layer_set_bitmap(s_cat_layer, s_cat_bitmap);
   bitmap_layer_set_compositing_mode(s_cat_layer, GCompOpSet);
 
   // umbrella: 74, 63
-  s_umbrella_layer = bitmap_layer_create(GRect(74 + X_OFFSET, 63 + Y_OFFSET, 52, 35));
+  s_umbrella_layer = bitmap_layer_create(GRect(FLY_START_X + UMBRELLA_X + X_OFFSET, UMBRELLA_Y + Y_OFFSET, 52, 35));
   s_umbrella_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_UMBRELLA);
   bitmap_layer_set_bitmap(s_umbrella_layer, s_umbrella_bitmap);
   bitmap_layer_set_compositing_mode(s_umbrella_layer, GCompOpSet);
@@ -338,13 +472,13 @@ static void main_window_load(Window *window) {
   layer_add_child(window_layer, bitmap_layer_get_layer(s_moon_bm_layer));
   layer_add_child(window_layer, s_moon_layer);
   layer_add_child(window_layer, bitmap_layer_get_layer(s_cloud_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
-  layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_broom_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_body_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_witch_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_cat_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_umbrella_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+  layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
 }
 
 // unload everything!
@@ -505,6 +639,8 @@ static void init() {
   update_time();
   update_weather();
   update_moon();
+
+  start_animation();
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
