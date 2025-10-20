@@ -21,6 +21,7 @@ static int fly_start_x;
 static int16_t float_offset_y;
 static int float_start_y, float_end_y;
 static int frames[FLOAT_COUNTS + 1];
+static bool got_weather = false;
 
 static void temp_update_moon(time_t temp) {
   if (((temp / 20) % 2) == 1) {
@@ -371,7 +372,7 @@ static void default_settings() {
   settings.UseCurrentLocation = true;     // use GPS for weather
   settings.WeatherCheckRate = 15;         // check every 15 mins
   strcpy(settings.Latitude, "42.36");     // MIT latitude
-  strcpy(settings.Latitude, "-71.1");     // MIT longitude
+  strcpy(settings.Longitude, "-71.1");     // MIT longitude
   settings.AmericanDate = true;           // Fri Oct 31 by default
   settings.VibrateOnDisc = true;          // vibrate by default
   
@@ -386,6 +387,61 @@ static void default_settings() {
 static void load_settings() {
   default_settings();
   // persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
+static void request_weather() {
+  DictionaryIterator *iter;
+  AppMessageResult result = app_message_outbox_begin(&iter);
+
+  if (result == APP_MSG_OK) {
+    // tell the app whether to use current location, celsius, and also the lat and lon
+    dict_write_uint8(iter, MESSAGE_KEY_UseCurrentLocation, settings.UseCurrentLocation);
+    dict_write_uint8(iter, MESSAGE_KEY_TemperatureMetric, settings.TemperatureMetric);
+    dict_write_cstring(iter, MESSAGE_KEY_Latitude, settings.Latitude);
+    dict_write_cstring(iter, MESSAGE_KEY_Longitude, settings.Longitude);
+
+    // Send the message
+    result = app_message_outbox_send();
+  }
+}
+
+// Received data! Either for weather or settings
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  // Current temperature and weather conditions
+  Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
+  Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
+
+  // if weather data is available, use it
+  if (temp_tuple && conditions_tuple) {
+    settings.TEMPERATURE = (int)temp_tuple->value->int32;
+    settings.CONDITIONS = (Weather)conditions_tuple->value->int32;
+    got_weather = true;
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Temperature: %d - Conditions: %d", settings.TEMPERATURE, settings.CONDITIONS);
+  } else { // we weren't given weather, so either settings were updated or we were poked. Request it now
+    request_weather();
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Requesting weather b/c of poke...");
+  }
+
+  update_time();
+  update_weather();
+  update_moon();
+  // start_animation();
+  // save_settings(); // save the new settings! Current weather included
+}
+
+// Message failed to receive
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+// Message failed to send
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
+// Message sent successfully
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
 
 // setup the display
@@ -536,70 +592,6 @@ static void main_window_unload(Window *window) {
     gbitmap_destroy(s_umbrella_bitmap);
 }
 
-// // update the time display
-// static void update_time() {
-// #ifdef DEMO_MODE
-//   text_layer_set_text(s_hour_layer, DEMO_CYCLE ? s_demo_hours[DEMO_CYCLE_POS] : DEMO_HOUR);
-//   text_layer_set_text(s_colon_layer, ":");
-//   text_layer_set_text(s_minute_layer, DEMO_CYCLE ? s_demo_minutes[DEMO_CYCLE_POS] : DEMO_MINUTE);
-// #else
-//   time_t temp = time(NULL);
-//   struct tm *tick_time = localtime(&temp);
-
-//   // put hours and minutes into buffer
-//   static char s_hour_buffer[8];
-//   strftime(s_hour_buffer, sizeof(s_hour_buffer), clock_is_24h_style() ?
-//                                         "%H" : "%I", tick_time);
-//   text_layer_set_text(s_hour_layer, s_hour_buffer); 
-  
-//   text_layer_set_text(s_colon_layer, ":");
-
-//   static char s_minute_buffer[8];
-//   strftime(s_minute_buffer, sizeof(s_minute_buffer), "%M", tick_time);
-//   text_layer_set_text(s_minute_layer, s_minute_buffer);  
-// #endif
-// }
-
-// static void update_date(struct tm *tick_time){
-// #ifdef DEMO_MODE
-//   if (DEMO_CYCLE) {
-//     text_layer_set_text(s_date_layer, s_demo_dates[DEMO_CYCLE_POS]);
-//     text_layer_set_text(s_day_layer, s_demo_days[DEMO_CYCLE_POS]);
-    
-//     gbitmap_destroy(s_day_icon_bitmap);
-//     s_day_icon_bitmap = gbitmap_create_with_resource(DAY_ICONS[s_demo_day_icons[DEMO_CYCLE_POS]]);
-//     bitmap_layer_set_bitmap(s_day_icon_layer, s_day_icon_bitmap);
-    
-//   } else {
-//     text_layer_set_text(s_date_layer, DEMO_DATE);
-//     text_layer_set_text(s_day_layer, DEMO_DAY);
-    
-//     gbitmap_destroy(s_day_icon_bitmap);
-//     s_day_icon_bitmap = gbitmap_create_with_resource(DAY_ICONS[DEMO_DAY_ICON]);
-//     bitmap_layer_set_bitmap(s_day_icon_layer, s_day_icon_bitmap);
-//   }
-// #else
-//   static char s_date_buffer[8];
-//   if (settings.AmericanDate) {
-//     strftime(s_date_buffer, sizeof(s_date_buffer), "%b %d", tick_time); // displayed as "Jan 01"
-//   } else {
-//     strftime(s_date_buffer, sizeof(s_date_buffer), "%d %b", tick_time); // displayed as "01 Jan"
-//   }
-
-//   text_layer_set_text(s_date_layer, s_date_buffer);
-
-//   static char s_day_buffer[8];
-//   strftime(s_day_buffer, sizeof(s_day_buffer), "%a", tick_time);
-//   text_layer_set_text(s_day_layer, s_day_buffer);
-
-//   gbitmap_destroy(s_day_icon_bitmap);
-//   s_day_icon_bitmap = gbitmap_create_with_resource(DAY_ICONS[tick_time->tm_wday]);
-//   bitmap_layer_set_bitmap(s_day_icon_layer, s_day_icon_bitmap);
-// #endif
-
-//   refresh_colors();
-// }
-
 // static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
 //   update_time(); // display the time
 
@@ -649,21 +641,16 @@ static void init() {
     .pebble_app_connection_handler = bluetooth_callback
   });
 
-  // // callback for bluetooth connection updates
-  // connection_service_subscribe((ConnectionHandlers) {
-  //   .pebble_app_connection_handler = bluetooth_callback
-  // });
+  // Register callbacks for settings/weather updates
+  app_message_register_inbox_received(inbox_received_callback);
+  app_message_register_inbox_dropped(inbox_dropped_callback);
+  app_message_register_outbox_failed(outbox_failed_callback);
+  app_message_register_outbox_sent(outbox_sent_callback);
 
-  // // Register callbacks for settings/weather updates
-  // app_message_register_inbox_received(inbox_received_callback);
-  // app_message_register_inbox_dropped(inbox_dropped_callback);
-  // app_message_register_outbox_failed(outbox_failed_callback);
-  // app_message_register_outbox_sent(outbox_sent_callback);
-
-  // // Open AppMessage
-  // const int inbox_size = 1024; // maaaaybe overkill, but 128 isn't enough
-  // const int outbox_size = 1024;
-  // app_message_open(inbox_size, outbox_size);
+  // Open AppMessage
+  const int inbox_size = 1024; // maaaaybe overkill, but 128 isn't enough
+  const int outbox_size = 1024;
+  app_message_open(inbox_size, outbox_size);
 }
 
 static void deinit() {

@@ -24,7 +24,12 @@
       "watchface": true
     },
     "messageKeys": [
-      "dummy"
+      "TEMPERATURE",
+      "CONDITIONS",
+      "UseCurrentLocation",
+      "Latitude",
+      "Longitude",
+      "TemperatureMetric"
     ],
     "resources": {
       "media": [
