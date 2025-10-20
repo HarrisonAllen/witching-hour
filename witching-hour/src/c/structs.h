@@ -12,6 +12,18 @@ typedef enum weather {
     SNOWY,
     STORMY
 } Weather;
+
+typedef enum flyState {
+  OFF_SCREEN,
+  FLYING_IN,
+  ON_SCREEN,
+  FLYING_OUT
+} FlyState;
+
+typedef enum floatState {
+  IDLE,
+  FLOATING
+} FloatState;
   
 // Define settings struct
 typedef struct ClaySettings {

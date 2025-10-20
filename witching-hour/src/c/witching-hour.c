@@ -2,6 +2,7 @@
 #include "structs.h"
 #include "defines.h"
 #include "helpers.h"
+#include "animations.h"
 
 // Window
 static Window *s_main_window;
@@ -20,8 +21,14 @@ static int16_t fly_offset_x;
 static int fly_start_x;
 static int16_t float_offset_y;
 static int float_start_y, float_end_y;
-static int frames[FLOAT_COUNTS + 1];
 static bool got_weather = false;
+static AppTimer *anim_timer;
+static FlyState fly_state;
+static int fly_tick;
+static FloatState float_state;
+static int float_tick;
+static int float_cycle;
+static bool queue_screen_refresh = true;
 
 static void temp_update_moon(time_t temp) {
   if (((temp / 20) % 2) == 1) {
@@ -245,121 +252,85 @@ static void set_witch_group_position() {
   set_witch_group_member_position(s_umbrella_layer, UMBRELLA_X, UMBRELLA_Y);
 }
 
-static void anim_setup(Animation *animation) {
-
+static bool is_animating() {
+  return (fly_state != ON_SCREEN && fly_state != OFF_SCREEN) || (float_state != IDLE);
 }
 
-static void anim_update(Animation *animation, const AnimationProgress progress) {
-  float_offset_y = lerp(float_start_y, float_end_y, ((float)progress) / ANIMATION_NORMALIZED_MAX);
-  fly_offset_x = lerp(fly_start_x, 0, ((float)progress) / ANIMATION_NORMALIZED_MAX);
-  set_witch_group_position();
-}
-
-static void anim_teardown(Animation *animation) {
-
-}
-
-static void fly_anim_started_handler(Animation *animation, void *context) {
-  fly_offset_x = FLY_START_X;
-  fly_start_x = FLY_START_X;
-  float_start_y = 0;
-  float_end_y = -(FLOAT_DISTANCE / 2);
-  float_offset_y = float_start_y;
-  set_witch_group_position();
-}
-
-static void fly_anim_stopped_handler(Animation *animation, bool finished, void *context) {
-  fly_offset_x = 0;
-  fly_start_x = 0;
-  set_witch_group_position();
-}
-
-static Animation * create_fly_animation() {
-  Animation *animation = animation_create();
-  animation_set_curve(animation, AnimationCurveEaseOut);
-  animation_set_duration(animation, FLY_ANIMATION_DURATION);
-  animation_set_delay(animation, 500);
-
-  const AnimationImplementation implementation = {
-    .setup = anim_setup,
-    .update = anim_update,
-    .teardown = anim_teardown
-  };
-  animation_set_implementation(animation, &implementation);
-  animation_set_handlers(animation, (AnimationHandlers) {
-    .started = fly_anim_started_handler,
-    .stopped = fly_anim_stopped_handler
-  }, NULL);
-  
-  return animation;
-}
-static void float_anim_started_handler(Animation *animation, void *context) {
-  int float_frame = *((int *)(context));
-  if (float_frame == 0) {
-    float_start_y = 0;
-    float_end_y = -(FLOAT_DISTANCE / 2);
-    float_offset_y = float_start_y;
-  } else if (float_frame == FLOAT_COUNTS - 1) {
-    float_start_y = (FLOAT_DISTANCE / 2);
-    float_end_y = 0;
-    float_offset_y = float_start_y;
-  } else if (float_frame % 2 == 1) {
-    float_start_y = -(FLOAT_DISTANCE / 2);
-    float_end_y = (FLOAT_DISTANCE / 2);
-    float_offset_y = float_start_y;
-  } else if (float_frame % 2 == 0) {
-    float_start_y = (FLOAT_DISTANCE / 2);
-    float_end_y = -(FLOAT_DISTANCE / 2);
-    float_offset_y = float_start_y;
-  }
-  set_witch_group_position();
-}
-
-static void float_anim_stopped_handler(Animation *animation, bool finished, void *context) {
-  float_offset_y = float_end_y;
-  set_witch_group_position();
-}
-
-static Animation * create_float_animation(int float_frame) {
-  Animation *animation = animation_create();
-  animation_set_curve(animation, AnimationCurveEaseInOut);
-  animation_set_duration(animation, FLOAT_ANIMATION_DURATION);
-  animation_set_delay(animation, 200);
-
-  const AnimationImplementation implementation = {
-    .setup = anim_setup,
-    .update = anim_update,
-    .teardown = anim_teardown
-  };
-  animation_set_implementation(animation, &implementation);
-  animation_set_handlers(animation, (AnimationHandlers) {
-    .started = float_anim_started_handler,
-    .stopped = float_anim_stopped_handler
-  }, &frames[float_frame]);
-
-  return animation;
-}
+static void animation_step(void *context);
 
 static void start_animation() {
-  for (int i = 0; i < FLOAT_COUNTS; i++) {
-    frames[i] = i+1;
+  if (is_animating()) {
+    if (fly_state != FLYING_OUT && fly_state != OFF_SCREEN) {
+      queue_screen_refresh = true;
+    }
+  } else {
+    // setup fly
+    fly_tick = 0;
+    if (fly_state == ON_SCREEN) {
+      fly_state = FLYING_OUT;
+      fly_offset_x = FLY_OUT_CURVE_1[fly_tick];
+    } else {
+      fly_state = FLYING_IN;
+      fly_offset_x = FLY_IN_CURVE_1[fly_tick];
+    }
+    // setup float
+    float_tick = 0;
+    float_cycle = 0;
+    float_state = FLOATING;
+    float_offset_y = FLOAT_CURVE_2[float_tick / FLOAT_SLOWER];
+    set_witch_group_position();
+    anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+  }
+}
+
+static void animation_step(void *context) {
+  if (fly_state == FLYING_OUT) {
+    fly_offset_x = FLY_OUT_CURVE_1[fly_tick];
+    fly_tick += 1;
+    if (fly_tick >= FLY_TICKS) {
+      fly_state = OFF_SCREEN;
+    }
+  } else if (fly_state == FLYING_IN) {
+    fly_offset_x = FLY_IN_CURVE_1[fly_tick];
+    fly_tick += 1;
+    if (fly_tick >= FLY_TICKS) {
+      fly_state = ON_SCREEN;
+    }
   }
 
-  Animation **arr = (Animation**)malloc((FLOAT_COUNTS + 1) * sizeof(Animation*));
-  arr[0] = create_fly_animation();
-  for (int i = 1; i < FLOAT_COUNTS; i++) {
-    arr[i] = create_float_animation(i-1);
+  if (float_state == FLOATING) {
+    if (fly_state == OFF_SCREEN) {
+      float_state = IDLE;
+      float_offset_y = 0;
+    } else {
+      float_offset_y = FLOAT_CURVE_2[float_tick / FLOAT_SLOWER];
+      float_tick += 1;
+      if (float_tick >= FLOAT_TICKS) {
+        float_cycle++;
+        if (float_cycle > FLOAT_CYCLES) {
+          float_state = IDLE;
+          float_offset_y = 0;
+        } else {
+          float_tick = 0;
+        }
+      }
+    }
   }
-  float_start_y = 0;
-  float_end_y = 0;
-  float_offset_y = 0;
 
-  Animation *sequence = animation_sequence_create_from_array(arr, (FLOAT_COUNTS + 1));
-  animation_set_play_count(sequence, 1);
+  set_witch_group_position();
 
-  animation_schedule(sequence);
-
-  free(arr);
+  if (is_animating()) {
+    anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+  } else {
+    if (queue_screen_refresh && fly_state == ON_SCREEN) {
+      start_animation();
+      queue_screen_refresh = false;
+    } else if (fly_state == OFF_SCREEN) {
+      update_weather();
+      update_moon();
+      start_animation();
+    }
+  }
 }
 
 static void default_settings() {  
@@ -423,9 +394,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
 
   update_time();
-  update_weather();
-  update_moon();
-  // start_animation();
+  start_animation();
   // save_settings(); // save the new settings! Current weather included
 }
 
@@ -633,6 +602,8 @@ static void init() {
   update_moon();
 
   start_animation();
+  settings.TEMPERATURE = 20;              // placeholder temperature
+  settings.CONDITIONS = PARTLYCLOUDY;           // placeholder weather
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
