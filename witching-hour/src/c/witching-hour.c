@@ -307,7 +307,7 @@ static void animation_step(void *context) {
       float_tick += 1;
       if (float_tick >= FLOAT_TICKS) {
         float_cycle++;
-        if (float_cycle > FLOAT_CYCLES) {
+        if (float_cycle >= FLOAT_CYCLES) {
           float_state = IDLE;
           float_offset_y = 0;
         } else {
@@ -535,6 +535,8 @@ static void main_window_unload(Window *window) {
     bitmap_layer_destroy(s_weather_layer);
   if (s_broom_layer != NULL)
     bitmap_layer_destroy(s_broom_layer);
+  if (s_body_layer != NULL)
+    bitmap_layer_destroy(s_body_layer);
   if (s_witch_layer != NULL)
     bitmap_layer_destroy(s_witch_layer);
   if (s_cat_layer != NULL)
@@ -554,6 +556,8 @@ static void main_window_unload(Window *window) {
   if (s_broom_bitmap != NULL)
     gbitmap_destroy(s_broom_bitmap);
   if (s_witch_bitmap != NULL)
+    gbitmap_destroy(s_body_bitmap);
+  if (s_cat_bitmap != NULL)
     gbitmap_destroy(s_witch_bitmap);
   if (s_cat_bitmap != NULL)
     gbitmap_destroy(s_cat_bitmap);
