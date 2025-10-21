@@ -54,10 +54,9 @@ var xhrRequest = function (url, type, callback) {
 	xhr.send();
 };
 
-function locationSuccess(pos) {
-
-	// Construct URL
-    https://api.open-meteo.com/v1/forecast?latitude=39.765&longitude=-83.75&current=temperature_2m,weather_code
+function fetchWeather(pos) {
+	// Weather
+    // https://api.open-meteo.com/v1/forecast?latitude=39.765&longitude=-83.75&current=temperature_2m,weather_code
     var url = 'https://api.open-meteo.com/v1/forecast?' +
       'latitude=' + ((pos != null) ? pos.coords.latitude : lat) +
       '&longitude=' + ((pos != null) ? pos.coords.longitude : lon) +
@@ -67,7 +66,6 @@ function locationSuccess(pos) {
     console.log("Requesting " + url);
 	xhrRequest(url, 'GET',
 		function(responseText) {
-            console.log("Weather response: " + responseText);
 			// responseText contains a JSON object with weather info
 			var json = JSON.parse(responseText);
 
@@ -78,7 +76,8 @@ function locationSuccess(pos) {
 
 			var dictionary = {
 				'TEMPERATURE': temperature,
-				'CONDITIONS': weather_type
+				'CONDITIONS': weather_type,
+                'NO_REQUEST': true
 			};
 			Pebble.sendAppMessage(dictionary,
 				function(e) {
@@ -90,6 +89,51 @@ function locationSuccess(pos) {
 			);
 		}
 	);
+}
+
+function fetchMoon(pos) {
+	// Moon
+    // https://aa.usno.navy.mil/api/rstt/oneday?date=2025-10-20&coords=42.36,-71.09&ID=witching
+    var today = new Date();
+    var dd = today.getDate();
+    var mm = today.getMonth() + 1; //January is 0!
+    var yyyy = today.getFullYear();
+    var url = 'https://aa.usno.navy.mil/api/rstt/oneday?' +
+      'date=' + yyyy + '-' + mm + '-' + dd +
+      '&coords=' + ((pos != null) ? pos.coords.latitude : lat) + ',' + ((pos != null) ? pos.coords.longitude : lon) +
+      '&id=witching';
+
+    console.log("Requesting " + url);
+	xhrRequest(url, 'GET',
+		function(responseText) {
+			// responseText contains a JSON object with moon
+			var json = JSON.parse(responseText);
+            var fracillum_str = json.properties.data.fracillum.slice(0, -1);
+            var fracillum_pct = Number(fracillum_str);
+            var waning = json.properties.data.curphase.indexOf("Waning") !== -1;
+			// var temperature = Math.round(json.current.temperature_2m);
+            // console.log("Conditions: " + weather_type + " Temperature: " + temperature);
+
+			var dictionary = {
+                'MOON_FRACILLUM': fracillum_pct,
+                'MOON_WANING': waning ? 1 : 0,
+                'NO_REQUEST': true
+			};
+			Pebble.sendAppMessage(dictionary,
+				function(e) {
+					console.log('Moon info sent to Pebble successfully!');
+				},
+				function(e) {
+					console.log('Error sending moon info to Pebble!');
+				}
+			);
+		}
+	);
+}
+
+function locationSuccess(pos) {
+    fetchWeather(pos);
+    fetchMoon(pos);
 }
 
 function locationError(err) {

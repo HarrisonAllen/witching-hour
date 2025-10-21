@@ -19,7 +19,6 @@ static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitm
 static ClaySettings settings;
 static bool got_weather = false;
 static AppTimer *anim_timer;
-
 static FlyState fly_state;
 static int16_t fly_offset_x;
 static int fly_tick;
@@ -32,6 +31,8 @@ static int16_t cloud_offset_y;
 static int16_t weather_offset_y;
 static int weather_tick;
 static bool queue_screen_refresh = true;
+int new_moon_frac = -1;
+bool new_moon_waning;
 
 static void temp_update_moon(time_t temp) {
   if (((temp / 20) % 2) == 1) {
@@ -238,6 +239,11 @@ static void update_moon() {
   struct tm *tick_time = localtime(&temp);
   layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), !(tick_time->tm_mon == 9 && tick_time->tm_mday == 31));
   layer_set_hidden(s_moon_layer, (tick_time->tm_mon == 9 && tick_time->tm_mday == 31));
+  if (new_moon_frac > -1) {
+    settings.MOON_FRACILLUM = new_moon_frac;
+    settings.MOON_WANING = new_moon_waning;
+  }
+  layer_mark_dirty(s_moon_layer);
 }
 
 static void set_witch_group_member_position(BitmapLayer *layer, int base_x, int base_y) {
@@ -460,21 +466,30 @@ static void request_weather() {
   }
 }
 
-// Received data! Either for weather or settings
+// Received data! Either for weather, moon, or settings
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
   // Current temperature and weather conditions
   Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
   Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
-
-  // if weather data is available, use it
   if (temp_tuple && conditions_tuple) {
     settings.TEMPERATURE = (int)temp_tuple->value->int32;
     settings.CONDITIONS = (Weather)conditions_tuple->value->int32;
     got_weather = true;
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Temperature: %d - Conditions: %d", settings.TEMPERATURE, settings.CONDITIONS);
-  } else { // we weren't given weather, so either settings were updated or we were poked. Request it now
+  }
+
+  Tuple *frac_tuple = dict_find(iterator, MESSAGE_KEY_MOON_FRACILLUM);
+  Tuple *waning_tuple = dict_find(iterator, MESSAGE_KEY_MOON_WANING);
+  if (frac_tuple && waning_tuple) {
+    new_moon_frac = (int)frac_tuple->value->int32;
+    new_moon_waning = waning_tuple->value->int32 == 1;
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Fracillum: %d - Waning: %d", new_moon_frac, new_moon_waning ? 1 : 0);
+  }
+
+  Tuple *no_request_tuple = dict_find(iterator, MESSAGE_KEY_NO_REQUEST);
+  if (!no_request_tuple) {
     request_weather();
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Requesting weather b/c of poke...");
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "Requesting weather from non-weather response...");
   }
 
   update_time();

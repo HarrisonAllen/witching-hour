@@ -26,6 +26,9 @@
     "messageKeys": [
       "TEMPERATURE",
       "CONDITIONS",
+      "MOON_FRACILLUM",
+      "MOON_WANING",
+      "NO_REQUEST",
       "UseCurrentLocation",
       "Latitude",
       "Longitude",
