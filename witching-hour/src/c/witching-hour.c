@@ -17,17 +17,20 @@ static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitm
         *s_body_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
 // Globals
 static ClaySettings settings;
-static int16_t fly_offset_x;
-static int fly_start_x;
-static int16_t float_offset_y;
-static int float_start_y, float_end_y;
 static bool got_weather = false;
 static AppTimer *anim_timer;
+
 static FlyState fly_state;
+static int16_t fly_offset_x;
 static int fly_tick;
 static FloatState float_state;
+static int16_t float_offset_y;
 static int float_tick;
 static int float_cycle;
+static FlyState weather_state;
+static int16_t cloud_offset_y;
+static int16_t weather_offset_y;
+static int weather_tick;
 static bool queue_screen_refresh = true;
 
 static void temp_update_moon(time_t temp) {
@@ -252,17 +255,46 @@ static void set_witch_group_position() {
   set_witch_group_member_position(s_umbrella_layer, UMBRELLA_X, UMBRELLA_Y);
 }
 
-static bool is_animating() {
-  return (fly_state != ON_SCREEN && fly_state != OFF_SCREEN) || (float_state != IDLE);
+
+
+static void set_weather_group_position() {
+  GRect og_bounds, new_bounds;
+  // cloud
+  og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_cloud_layer));
+  new_bounds = GRect(CLOUDS_X + X_OFFSET, CLOUDS_Y + Y_OFFSET + cloud_offset_y, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(bitmap_layer_get_layer(s_cloud_layer), new_bounds);
+  // moon
+  og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_moon_bm_layer));
+  new_bounds = GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET + cloud_offset_y, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(bitmap_layer_get_layer(s_moon_bm_layer), new_bounds);
+  layer_set_frame(s_moon_layer, new_bounds);
+  // weather
+  og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_weather_layer));
+  new_bounds = GRect(WEATHER_X + X_OFFSET, WEATHER_Y + Y_OFFSET + weather_offset_y, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(bitmap_layer_get_layer(s_weather_layer), new_bounds);
+}
+
+static bool is_witch_flying() {
+  return (fly_state != ON_SCREEN && fly_state != OFF_SCREEN);
+}
+
+static bool is_witch_floating() {
+  return (float_state != IDLE);
+}
+
+static bool is_witch_animating() {
+  return is_witch_flying() || is_witch_floating();
+}
+
+static bool is_weather_animating() {
+  return (weather_state != ON_SCREEN && weather_state != OFF_SCREEN);
 }
 
 static void animation_step(void *context);
 
-static void start_animation() {
-  if (is_animating()) {
-    if (fly_state != FLYING_OUT && fly_state != OFF_SCREEN) {
-      queue_screen_refresh = true;
-    }
+static void start_witch_animation() {
+  if (is_witch_flying()) {
+    queue_screen_refresh = true;
   } else {
     // setup fly
     fly_tick = 0;
@@ -274,61 +306,113 @@ static void start_animation() {
       fly_offset_x = FLY_IN_CURVE_1[fly_tick];
     }
     // setup float
-    float_tick = 0;
+    if (!is_witch_floating()) {
+      float_tick = 0;
+      float_offset_y = FLOAT_CURVE_2[float_tick / FLOAT_SLOWER];
+      float_state = FLOATING;
+    }
     float_cycle = 0;
-    float_state = FLOATING;
-    float_offset_y = FLOAT_CURVE_2[float_tick / FLOAT_SLOWER];
     set_witch_group_position();
     anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
   }
 }
 
-static void animation_step(void *context) {
-  if (fly_state == FLYING_OUT) {
-    fly_offset_x = FLY_OUT_CURVE_1[fly_tick];
-    fly_tick += 1;
-    if (fly_tick >= FLY_TICKS) {
-      fly_state = OFF_SCREEN;
-    }
-  } else if (fly_state == FLYING_IN) {
-    fly_offset_x = FLY_IN_CURVE_1[fly_tick];
-    fly_tick += 1;
-    if (fly_tick >= FLY_TICKS) {
-      fly_state = ON_SCREEN;
-    }
-  }
-
-  if (float_state == FLOATING) {
-    if (fly_state == OFF_SCREEN) {
-      float_state = IDLE;
-      float_offset_y = 0;
+static void start_weather_animation() {
+  if (!is_weather_animating()) {
+    weather_tick = 0;
+    if (weather_state == ON_SCREEN) {
+      weather_state = FLYING_OUT;
+      weather_offset_y = WEATHER_OUT_CURVE[weather_tick];
+      cloud_offset_y = CLOUD_OUT_CURVE[weather_tick];
     } else {
-      float_offset_y = FLOAT_CURVE_2[float_tick / FLOAT_SLOWER];
-      float_tick += 1;
-      if (float_tick >= FLOAT_TICKS) {
-        float_cycle++;
-        if (float_cycle >= FLOAT_CYCLES) {
-          float_state = IDLE;
-          float_offset_y = 0;
-        } else {
-          float_tick = 0;
+      weather_state = FLYING_IN;
+      weather_offset_y = WEATHER_IN_CURVE[weather_tick];
+      cloud_offset_y = CLOUD_IN_CURVE[weather_tick];
+    }
+    set_weather_group_position();
+    anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+  }
+}
+
+static void animation_step(void *context) {
+  // Handle weather
+  if (weather_state == FLYING_OUT) {
+    weather_offset_y = WEATHER_OUT_CURVE[weather_tick];
+    cloud_offset_y = CLOUD_OUT_CURVE[weather_tick];
+    weather_tick += 1;
+    if (weather_tick >= WEATHER_TICKS) {
+      weather_state = OFF_SCREEN;
+    }
+    set_weather_group_position();
+  } else if (weather_state == FLYING_IN) {
+    weather_offset_y = WEATHER_IN_CURVE[weather_tick];
+    cloud_offset_y = CLOUD_IN_CURVE[weather_tick];
+    weather_tick += 1;
+    if (weather_tick >= WEATHER_TICKS) {
+      weather_state = ON_SCREEN;
+    }
+    set_weather_group_position();
+  } else {
+    // Handle fly
+    if (fly_state == FLYING_OUT) {
+      fly_offset_x = FLY_OUT_CURVE_1[fly_tick];
+      fly_tick += 1;
+      if (fly_tick >= FLY_TICKS) {
+        fly_state = OFF_SCREEN;
+      }
+    } else if (fly_state == FLYING_IN) {
+      fly_offset_x = FLY_IN_CURVE_1[fly_tick];
+      fly_tick += 1;
+      if (fly_tick >= FLY_TICKS) {
+        fly_state = ON_SCREEN;
+      }
+    }
+
+    // Handle float
+    if (float_state == FLOATING) {
+      if (fly_state == OFF_SCREEN) {
+        float_state = IDLE;
+        float_offset_y = 0;
+      } else {
+        float_offset_y = FLOAT_CURVE_2[float_tick / FLOAT_SLOWER];
+        float_tick += 1;
+        if (float_tick >= FLOAT_TICKS) {
+          float_cycle++;
+          if (float_cycle >= FLOAT_CYCLES) {
+            float_state = IDLE;
+            float_offset_y = 0;
+          } else {
+            float_tick = 0;
+          }
         }
       }
     }
+
+    set_witch_group_position();
   }
-
-  set_witch_group_position();
-
-  if (is_animating()) {
+  
+  if (is_witch_flying() || is_weather_animating()) {
     anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
   } else {
-    if (queue_screen_refresh && fly_state == ON_SCREEN) {
-      start_animation();
-      queue_screen_refresh = false;
-    } else if (fly_state == OFF_SCREEN) {
+    if (weather_state == ON_SCREEN) {
+      if (fly_state == ON_SCREEN) {
+        if (queue_screen_refresh) {
+          start_witch_animation();
+        } else if (is_witch_floating()) {
+          anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+        }
+      } else {
+        if (queue_screen_refresh) {
+          start_weather_animation();
+        } else {
+          start_witch_animation();
+        }
+      }
+    } else {
       update_weather();
       update_moon();
-      start_animation();
+      start_weather_animation();
+      queue_screen_refresh = false;
     }
   }
 }
@@ -394,7 +478,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
 
   update_time();
-  start_animation();
+  start_witch_animation();
   // save_settings(); // save the new settings! Current weather included
 }
 
@@ -605,7 +689,7 @@ static void init() {
   update_weather();
   update_moon();
 
-  start_animation();
+  start_weather_animation();
   settings.TEMPERATURE = 20;              // placeholder temperature
   settings.CONDITIONS = PARTLYCLOUDY;           // placeholder weather
 
