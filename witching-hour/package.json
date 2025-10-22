@@ -4,9 +4,11 @@
   "version": "1.0.0",
   "keywords": ["pebble-app"],
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "pebble-clay": "^1.0.4"
+  },
   "pebble": {
-    "displayName": "witching-hour",
+    "displayName": "Witching Hour",
     "uuid": "f46681cd-ea13-42fc-895d-a3dafba75f9c",
     "sdkVersion": "3",
     "enableMultiJS": true,
@@ -29,10 +31,17 @@
       "MOON_FRACILLUM",
       "MOON_WANING",
       "NO_REQUEST",
+      "AmericanDate",
+      "WeatherCheckRate",
       "UseCurrentLocation",
       "Latitude",
       "Longitude",
-      "TemperatureMetric"
+      "TemperatureMetric",
+      "Temperature1",
+      "Temperature2",
+      "Temperature3",
+      "Temperature4",
+      "VibrateOnDisc"
     ],
     "resources": {
       "media": [

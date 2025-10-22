@@ -32,7 +32,6 @@ typedef struct ClaySettings {
   Weather CONDITIONS;                // Current weather conditions
   int MOON_FRACILLUM;              // Current moon visibility %
   bool MOON_WANING;                  // moon waning or waxing?
-  time_t last_weather_received;      // timestamp of last successful weather grab
   // General settings
   bool UseCurrentLocation;           // use GPS for weather?
   char Latitude[MAX_CHARS];          // latitude when not using GPS
@@ -42,7 +41,6 @@ typedef struct ClaySettings {
   bool VibrateOnDisc;                // vibrate on bluetooth disconnect?
   // Temperature Settings
   bool TemperatureMetric;          // Celsius or Fahrenheit?
-  int Temperature0;                // Freezing temperature
   int Temperature1;                // Cold temperature
   int Temperature2;                // Chilly temperature
   int Temperature3;                // Warm temperature

@@ -2,7 +2,7 @@
 #pragma once
 
 // Overall
-#define TICK_DURATION 200
+#define TICK_DURATION 100
 
 // Flying
 #define FLY_START_X -131

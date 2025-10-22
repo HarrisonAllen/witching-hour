@@ -17,7 +17,7 @@ static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitm
         *s_body_bitmap, *s_witch_bitmap, *s_cat_bitmap, *s_umbrella_bitmap;
 // Globals
 static ClaySettings settings;
-static bool got_weather = false;
+static bool weather_stale = true;
 static AppTimer *anim_timer;
 static FlyState fly_state;
 static int16_t fly_offset_x;
@@ -273,8 +273,6 @@ static void set_witch_group_position() {
   set_witch_group_member_position(s_umbrella_layer, UMBRELLA_X, UMBRELLA_Y);
 }
 
-
-
 static void set_weather_group_position() {
   GRect og_bounds, new_bounds;
   // cloud
@@ -331,7 +329,7 @@ static void start_witch_animation() {
     }
     float_cycle = 0;
     set_witch_group_position();
-    anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+    if (anim_timer == NULL) anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
   }
 }
 
@@ -348,9 +346,11 @@ static void start_weather_animation() {
       cloud_offset_y = CLOUD_IN_CURVE[weather_tick];
     }
     set_weather_group_position();
-    anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+    if (anim_timer == NULL) anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
   }
 }
+
+static void request_weather();
 
 static void animation_step(void *context) {
   // Handle weather
@@ -414,12 +414,19 @@ static void animation_step(void *context) {
   } else {
     if (weather_state == ON_SCREEN) {
       if (fly_state == ON_SCREEN) {
+        if (weather_stale) {
+          request_weather();
+        }
         if (queue_screen_refresh) {
+          anim_timer = NULL;
           start_witch_animation();
         } else if (is_witch_floating()) {
           anim_timer = app_timer_register(TICK_DURATION, animation_step, NULL);
+        } else {
+          anim_timer = NULL;
         }
       } else {
+        anim_timer = NULL;
         if (queue_screen_refresh) {
           start_weather_animation();
         } else {
@@ -427,6 +434,7 @@ static void animation_step(void *context) {
         }
       }
     } else {
+      anim_timer = NULL;
       update_weather();
       update_moon();
       start_weather_animation();
@@ -440,7 +448,6 @@ static void default_settings() {
   settings.CONDITIONS = RAINY;           // placeholder weather
   settings.MOON_FRACILLUM = 30;          // placeholder fracillum
   settings.MOON_WANING = true;
-  settings.last_weather_received = 0;     // placeholder time
 
   settings.UseCurrentLocation = true;     // use GPS for weather
   settings.WeatherCheckRate = 15;         // check every 15 mins
@@ -450,9 +457,8 @@ static void default_settings() {
   settings.VibrateOnDisc = true;          // vibrate by default
   
   settings.TemperatureMetric = false;        // Celsius or Fahrenheit?
-  settings.Temperature0 = 30;                // Freezing temperature
-  settings.Temperature1 = 50;                // Cold temperature
-  settings.Temperature2 = 65;                // Chilly temperature
+  settings.Temperature1 = 40;                // Cold temperature
+  settings.Temperature2 = 60;                // Chilly temperature
   settings.Temperature3 = 75;                // Warm temperature
   settings.Temperature4 = 90;                // Hot temperature
 }
@@ -480,7 +486,6 @@ static void request_weather() {
 
 // Received data! Either for weather, moon, or settings
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
-  // TODO: don't run animation if outfit/clouds/moon won't change
   bool trigger_animation = false;
   uint32_t old_weather_resource = get_weather_resource(settings.CONDITIONS);
   uint32_t old_cloud_resource = get_cloud_resource(settings.CONDITIONS);
@@ -495,10 +500,11 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     Weather new_weather = (Weather)conditions_tuple->value->int32;
     settings.TEMPERATURE = new_temp;
     settings.CONDITIONS = new_weather;
-    got_weather = true;
+    weather_stale = false;
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Temperature: %d - Conditions: %d", settings.TEMPERATURE, settings.CONDITIONS);
   }
 
+  // Current moon conditions
   Tuple *frac_tuple = dict_find(iterator, MESSAGE_KEY_MOON_FRACILLUM);
   Tuple *waning_tuple = dict_find(iterator, MESSAGE_KEY_MOON_WANING);
   if (frac_tuple && waning_tuple) {
@@ -507,11 +513,71 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Fracillum: %d - Waning: %d", new_moon_frac, new_moon_waning ? 1 : 0);
   }
 
-  Tuple *no_request_tuple = dict_find(iterator, MESSAGE_KEY_NO_REQUEST);
-  if (!no_request_tuple) {
-    request_weather();
-    APP_LOG(APP_LOG_LEVEL_DEBUG, "Requesting weather from non-weather response...");
+  // American date format?
+  Tuple *american_date_t = dict_find(iterator, MESSAGE_KEY_AmericanDate);
+  if(american_date_t) {
+    settings.AmericanDate = american_date_t->value->int32 == 1;
   }
+  // Use current location
+  Tuple *use_current_location_t = dict_find(iterator, MESSAGE_KEY_UseCurrentLocation);
+  if(use_current_location_t) {
+    settings.UseCurrentLocation = use_current_location_t->value->int32 == 1;
+  }
+
+  // Weather update rate
+  Tuple *weather_check_rate_t = dict_find(iterator, MESSAGE_KEY_WeatherCheckRate);
+  if(weather_check_rate_t) {
+    settings.WeatherCheckRate = weather_check_rate_t->value->int32;
+  }
+
+  // Manual Latitude
+  Tuple *latitude_t = dict_find(iterator, MESSAGE_KEY_Latitude);
+  if(latitude_t) {
+    strcpy(settings.Latitude,latitude_t->value->cstring);
+  }
+
+  // Manual Longitude
+  Tuple *longitude_t = dict_find(iterator, MESSAGE_KEY_Longitude);
+  if(longitude_t) {
+    strcpy(settings.Longitude,longitude_t->value->cstring);
+  }
+
+  // Celsius or Fahrenheit?
+  Tuple *temperature_metric_t = dict_find(iterator, MESSAGE_KEY_TemperatureMetric);
+  if(temperature_metric_t) {
+    settings.TemperatureMetric = temperature_metric_t->value->int32 == 1;
+  }
+
+  // Cold temperature
+  Tuple *temperature_1_t = dict_find(iterator, MESSAGE_KEY_Temperature1);
+  if(temperature_1_t) {
+    settings.Temperature1 = atoi(temperature_1_t->value->cstring);
+  }
+
+  // Comfortable temperature
+  Tuple *temperature_2_t = dict_find(iterator, MESSAGE_KEY_Temperature2);
+  if(temperature_2_t) {
+    settings.Temperature2 = atoi(temperature_2_t->value->cstring);
+  }
+
+  // Hot temperature
+  Tuple *temperature_3_t = dict_find(iterator, MESSAGE_KEY_Temperature3);
+  if(temperature_3_t) {
+    settings.Temperature3 = atoi(temperature_3_t->value->cstring);
+  }
+
+  // Hottest temperature
+  Tuple *temperature_4_t = dict_find(iterator, MESSAGE_KEY_Temperature4);
+  if(temperature_4_t) {
+    settings.Temperature4 = atoi(temperature_4_t->value->cstring);
+  }
+
+  // Vibrate on disconnect
+  Tuple *vibrate_on_disc_t = dict_find(iterator, MESSAGE_KEY_VibrateOnDisc);
+  if(vibrate_on_disc_t) {
+    settings.VibrateOnDisc = vibrate_on_disc_t->value->int32 == 1;
+  }
+
 
   update_time();
   trigger_animation = old_weather_resource != get_weather_resource(settings.CONDITIONS)
@@ -520,10 +586,18 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
                       || old_witch_resource != get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE)
                       || settings.MOON_FRACILLUM != new_moon_frac
                       || settings.MOON_WANING != new_moon_waning;
-
   if (trigger_animation) {
+    queue_screen_refresh = true;
     start_witch_animation();
   }
+
+  // Suppress weather request
+  // Tuple *no_request_tuple = dict_find(iterator, MESSAGE_KEY_NO_REQUEST);
+  // if (!no_request_tuple) {
+  //   request_weather();
+  //   APP_LOG(APP_LOG_LEVEL_DEBUG, "Requesting weather from non-weather response...");
+  // }
+
   // save_settings(); // save the new settings! Current weather included
 }
 
@@ -544,7 +618,9 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
   update_time();
-  request_weather(); // TODO: replace this with only after x amount of time
+  // if (weather_stale) { // TODO: set stale after x amount of time and request weather
+  //   request_weather();
+  // }
 }
 
 // setup the display
