@@ -30,7 +30,7 @@ static FlyState weather_state;
 static int16_t cloud_offset_y;
 static int16_t weather_offset_y;
 static int weather_tick;
-static bool queue_screen_refresh = true;
+static bool queue_screen_refresh = false;
 int new_moon_frac = -1;
 bool new_moon_waning;
 
@@ -64,10 +64,6 @@ static void update_time() {
 
   text_layer_set_text(s_time_layer, s_time_buffer);
   text_layer_set_text(s_date_layer, s_date_buffer);
-}
-
-static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
-  update_time();
 }
 
 // update the batter display layer
@@ -105,27 +101,66 @@ static void bluetooth_callback(bool connected) {
   }
 }
 
-static bool needs_umbrella() {
-  return settings.CONDITIONS == RAINY
-         || settings.CONDITIONS == SNOWY
-         || settings.CONDITIONS == STORMY;
+static bool needs_umbrella(Weather conditions) {
+  return conditions == RAINY
+         || conditions == SNOWY
+         || conditions == STORMY;
+}
+
+static uint32_t get_body_resource(Weather conditions) {
+  return needs_umbrella(conditions) ? RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA : RESOURCE_ID_IMAGE_WITCH_BODY_BASE;
+}
+
+static uint32_t get_witch_resource(Weather conditions, int temperature) {
+  uint32_t new_witch_resource;
+  uint32_t *witches = needs_umbrella(conditions) ? RAINY_WITCHES : SUNNY_WITCHES;
+  if (temperature >= settings.Temperature4) {
+    new_witch_resource = witches[4];
+  } else if (temperature >= settings.Temperature3) {
+    new_witch_resource = witches[3];
+  } else if (temperature >= settings.Temperature2) {
+    new_witch_resource = witches[2];
+  } else if (temperature >= settings.Temperature1) {
+    new_witch_resource = witches[1];
+  } else {
+    new_witch_resource = witches[0];
+  }
+  return new_witch_resource;
+}
+
+static uint32_t get_weather_resource(Weather conditions) {
+  uint32_t new_weather_resource = 0;
+  if (conditions == RAINY) {
+    new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
+  } else if (conditions == SNOWY) {
+    new_weather_resource = RESOURCE_ID_IMAGE_SNOW;
+  } else if (conditions == STORMY) {
+    new_weather_resource = RESOURCE_ID_IMAGE_STORM;
+  }
+  return new_weather_resource;
+}
+
+static uint32_t get_cloud_resource(Weather conditions) {
+  uint32_t new_cloud_resource = 0;
+  if (conditions == PARTLYCLOUDY) {
+    new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
+  } else {
+    new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_FULL;
+  }
+  return new_cloud_resource;
 }
 
 static void update_weather() {
-  uint32_t new_body_resource = RESOURCE_ID_IMAGE_WITCH_BODY_BASE;
-  uint32_t new_witch_resource = RESOURCE_ID_IMAGE_WITCH_WARM;
-  uint32_t new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
   uint32_t new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
 
-  uint32_t *witches = needs_umbrella() ? RAINY_WITCHES : SUNNY_WITCHES;
-  layer_set_hidden(bitmap_layer_get_layer(s_umbrella_layer), !needs_umbrella());
+  layer_set_hidden(bitmap_layer_get_layer(s_umbrella_layer), !needs_umbrella(settings.CONDITIONS));
 
   // Conditions (body)
   if (s_body_bitmap != NULL) {
     gbitmap_destroy(s_body_bitmap);
     s_body_bitmap = NULL;
   }
-  s_body_bitmap = gbitmap_create_with_resource(needs_umbrella() ? RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA : RESOURCE_ID_IMAGE_WITCH_BODY_BASE);
+  s_body_bitmap = gbitmap_create_with_resource(get_body_resource(settings.CONDITIONS));
   bitmap_layer_set_bitmap(s_body_layer, s_body_bitmap);
   
   // Temperature (witch)
@@ -133,18 +168,7 @@ static void update_weather() {
     gbitmap_destroy(s_witch_bitmap);
     s_witch_bitmap = NULL;
   }
-  if (settings.TEMPERATURE >= settings.Temperature4) {
-    new_witch_resource = witches[4];
-  } else if (settings.TEMPERATURE >= settings.Temperature3) {
-    new_witch_resource = witches[3];
-  } else if (settings.TEMPERATURE >= settings.Temperature2) {
-    new_witch_resource = witches[2];
-  } else if (settings.TEMPERATURE >= settings.Temperature1) {
-    new_witch_resource = witches[1];
-  } else {
-    new_witch_resource = witches[0];
-  }
-  s_witch_bitmap = gbitmap_create_with_resource(new_witch_resource);
+  s_witch_bitmap = gbitmap_create_with_resource(get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE));
   bitmap_layer_set_bitmap(s_witch_layer, s_witch_bitmap);
 
   // Conditions (background)
@@ -152,15 +176,8 @@ static void update_weather() {
     gbitmap_destroy(s_weather_bitmap);
     s_weather_bitmap = NULL;
   }
-  if (needs_umbrella()) {
-    if (settings.CONDITIONS == RAINY) {
-      new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
-    } else if (settings.CONDITIONS == SNOWY) {
-      new_weather_resource = RESOURCE_ID_IMAGE_SNOW;
-    } else if (settings.CONDITIONS == STORMY) {
-      new_weather_resource = RESOURCE_ID_IMAGE_STORM;
-    }
-    s_weather_bitmap = gbitmap_create_with_resource(new_weather_resource);
+  if (needs_umbrella(settings.CONDITIONS)) {
+    s_weather_bitmap = gbitmap_create_with_resource(get_weather_resource(settings.CONDITIONS));
     bitmap_layer_set_bitmap(s_weather_layer, s_weather_bitmap);
   } else {
     layer_set_hidden(bitmap_layer_get_layer(s_weather_layer), true);
@@ -172,12 +189,7 @@ static void update_weather() {
     s_cloud_bitmap = NULL;
   }
   if (settings.CONDITIONS != SUNNY) {
-    if (settings.CONDITIONS == PARTLYCLOUDY) {
-      new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
-    } else {
-      new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_FULL;
-    }
-    s_cloud_bitmap = gbitmap_create_with_resource(new_cloud_resource);
+    s_cloud_bitmap = gbitmap_create_with_resource(get_cloud_resource(settings.CONDITIONS));
     bitmap_layer_set_bitmap(s_cloud_layer, s_cloud_bitmap);
   } else {
     layer_set_hidden(bitmap_layer_get_layer(s_cloud_layer), true);
@@ -468,12 +480,21 @@ static void request_weather() {
 
 // Received data! Either for weather, moon, or settings
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  // TODO: don't run animation if outfit/clouds/moon won't change
+  bool trigger_animation = false;
+  uint32_t old_weather_resource = get_weather_resource(settings.CONDITIONS);
+  uint32_t old_cloud_resource = get_cloud_resource(settings.CONDITIONS);
+  uint32_t old_body_resource = get_body_resource(settings.CONDITIONS);
+  uint32_t old_witch_resource = get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE);
+
   // Current temperature and weather conditions
   Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
   Tuple *conditions_tuple = dict_find(iterator, MESSAGE_KEY_CONDITIONS);
   if (temp_tuple && conditions_tuple) {
-    settings.TEMPERATURE = (int)temp_tuple->value->int32;
-    settings.CONDITIONS = (Weather)conditions_tuple->value->int32;
+    int new_temp = (int)temp_tuple->value->int32;
+    Weather new_weather = (Weather)conditions_tuple->value->int32;
+    settings.TEMPERATURE = new_temp;
+    settings.CONDITIONS = new_weather;
     got_weather = true;
     APP_LOG(APP_LOG_LEVEL_DEBUG, "Temperature: %d - Conditions: %d", settings.TEMPERATURE, settings.CONDITIONS);
   }
@@ -493,7 +514,16 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
 
   update_time();
-  start_witch_animation();
+  trigger_animation = old_weather_resource != get_weather_resource(settings.CONDITIONS)
+                      || old_cloud_resource != get_cloud_resource(settings.CONDITIONS)
+                      || old_body_resource != get_body_resource(settings.CONDITIONS)
+                      || old_witch_resource != get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE)
+                      || settings.MOON_FRACILLUM != new_moon_frac
+                      || settings.MOON_WANING != new_moon_waning;
+
+  if (trigger_animation) {
+    start_witch_animation();
+  }
   // save_settings(); // save the new settings! Current weather included
 }
 
@@ -510,6 +540,11 @@ static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResul
 // Message sent successfully
 static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
+
+static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
+  update_time();
+  request_weather(); // TODO: replace this with only after x amount of time
 }
 
 // setup the display
@@ -705,8 +740,6 @@ static void init() {
   update_moon();
 
   start_weather_animation();
-  settings.TEMPERATURE = 20;              // placeholder temperature
-  settings.CONDITIONS = PARTLYCLOUDY;           // placeholder weather
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
