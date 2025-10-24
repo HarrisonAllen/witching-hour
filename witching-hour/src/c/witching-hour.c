@@ -18,6 +18,7 @@ static GBitmap *s_stars_bitmap, *s_moon_bitmap, *s_cloud_bitmap, *s_weather_bitm
 // Globals
 static ClaySettings settings;
 static bool weather_stale = true;
+static int weather_stale_counter;
 static AppTimer *anim_timer;
 static FlyState fly_state;
 static int16_t fly_offset_x;
@@ -469,6 +470,8 @@ static void load_settings() {
 }
 
 static void request_weather() {
+  weather_stale = false;
+  weather_stale_counter = 0;
   DictionaryIterator *iter;
   AppMessageResult result = app_message_outbox_begin(&iter);
 
@@ -591,13 +594,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     start_witch_animation();
   }
 
-  // Suppress weather request
-  // Tuple *no_request_tuple = dict_find(iterator, MESSAGE_KEY_NO_REQUEST);
-  // if (!no_request_tuple) {
-  //   request_weather();
-  //   APP_LOG(APP_LOG_LEVEL_DEBUG, "Requesting weather from non-weather response...");
-  // }
-
   // save_settings(); // save the new settings! Current weather included
 }
 
@@ -618,9 +614,14 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
   update_time();
-  // if (weather_stale) { // TODO: set stale after x amount of time and request weather
-  //   request_weather();
-  // }
+  weather_stale_counter++;
+  if (weather_stale_counter > settings.WeatherCheckRate) {
+    if (is_witch_animating() || is_weather_animating()) {
+      weather_stale = true;
+    } else {
+      request_weather();
+    }
+  }
 }
 
 // setup the display

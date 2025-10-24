@@ -79,8 +79,7 @@ function fetchWeather(pos) {
 
 			var dictionary = {
 				'TEMPERATURE': temperature,
-				'CONDITIONS': weather_type,
-                'NO_REQUEST': true
+				'CONDITIONS': weather_type
 			};
 			Pebble.sendAppMessage(dictionary,
 				function(e) {
@@ -119,8 +118,7 @@ function fetchMoon(pos) {
 
 			var dictionary = {
                 'MOON_FRACILLUM': fracillum_pct,
-                'MOON_WANING': waning ? 1 : 0,
-                'NO_REQUEST': true
+                'MOON_WANING': waning ? 1 : 0
 			};
 			Pebble.sendAppMessage(dictionary,
 				function(e) {
