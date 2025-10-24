@@ -4,6 +4,9 @@
 #include "helpers.h"
 #include "animations.h"
 
+// Defines
+#define SETTINGS_KEY 1
+
 // Window
 static Window *s_main_window;
 // Layers
@@ -466,7 +469,11 @@ static void default_settings() {
 
 static void load_settings() {
   default_settings();
-  // persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+  persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
+static void save_settings() {
+  persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
 }
 
 static void request_weather() {
@@ -594,7 +601,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     start_witch_animation();
   }
 
-  // save_settings(); // save the new settings! Current weather included
+  save_settings(); // save the new settings! Current weather included
 }
 
 // Message failed to receive
