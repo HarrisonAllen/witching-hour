@@ -34,7 +34,7 @@ static FlyState weather_state;
 static int16_t cloud_offset_y;
 static int16_t weather_offset_y;
 static int weather_tick;
-static bool queue_screen_refresh = false;
+static bool queue_screen_refresh;
 int new_moon_frac = -1;
 bool new_moon_waning;
 
@@ -258,6 +258,7 @@ static void update_moon() {
   if (new_moon_frac > -1) {
     settings.MOON_FRACILLUM = new_moon_frac;
     settings.MOON_WANING = new_moon_waning;
+    new_moon_frac = -1;
   }
   layer_mark_dirty(s_moon_layer);
 }
@@ -594,7 +595,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
                       || old_cloud_resource != get_cloud_resource(settings.CONDITIONS)
                       || old_body_resource != get_body_resource(settings.CONDITIONS)
                       || old_witch_resource != get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE)
-                      || settings.MOON_FRACILLUM != new_moon_frac
+                      || (settings.MOON_FRACILLUM != new_moon_frac && new_moon_frac != -1)
                       || settings.MOON_WANING != new_moon_waning;
   if (trigger_animation) {
     queue_screen_refresh = true;
