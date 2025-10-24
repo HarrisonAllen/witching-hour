@@ -114,7 +114,7 @@ function fetchMoon(pos) {
             var fracillum_pct = Number(fracillum_str);
             var waning = json.properties.data.curphase.indexOf("Waning") !== -1;
 			// var temperature = Math.round(json.current.temperature_2m);
-            // console.log("Conditions: " + weather_type + " Temperature: " + temperature);
+            console.log("Moon Frac: " + fracillum_pct + " Waning: " + (waning ? "yes" : "no"));
 
 			var dictionary = {
                 'MOON_FRACILLUM': fracillum_pct,

@@ -38,6 +38,16 @@ static bool queue_screen_refresh;
 int new_moon_frac = -1;
 bool new_moon_waning;
 
+// Demo mode!
+#define DEMO_MODE false
+static int demo_index;
+static int num_demos = 4;
+static Weather demo_conditions[] = {PARTLYCLOUDY, SNOWY, SUNNY, RAINY};
+static int demo_temps[] = {76, 0, 50, 100};
+static int demo_moon_fracs[] = {25, 0, 100, 75};
+static int demo_moon_wanings[] = {true, false, true, false};
+static int batteries[] = {70, 0, 20, 200};
+
 static void temp_update_moon(time_t temp) {
   if (((temp / 20) % 2) == 1) {
     settings.MOON_FRACILLUM = 100-(temp % 20) * 5;
@@ -78,6 +88,13 @@ static void battery_callback(BatteryChargeState state) {
     gbitmap_destroy(s_cat_bitmap);
     s_cat_bitmap = NULL;
   }
+  if (DEMO_MODE) {
+    if (batteries[demo_index] > 100) {
+      state.is_charging = true;
+    } else {
+      state.charge_percent = batteries[demo_index];
+    }
+  }
   if (state.is_charging) {
     new_cat_resource = RESOURCE_ID_IMAGE_CAT_STRETCHING;
   } else {
@@ -106,17 +123,27 @@ static void bluetooth_callback(bool connected) {
 }
 
 static bool needs_umbrella(Weather conditions) {
+  if (DEMO_MODE) {
+    conditions = demo_conditions[demo_index];
+  }
   return conditions == RAINY
          || conditions == SNOWY
          || conditions == STORMY;
 }
 
 static uint32_t get_body_resource(Weather conditions) {
+  if (DEMO_MODE) {
+    conditions = demo_conditions[demo_index];
+  }
   return needs_umbrella(conditions) ? RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA : RESOURCE_ID_IMAGE_WITCH_BODY_BASE;
 }
 
 static uint32_t get_witch_resource(Weather conditions, int temperature) {
   uint32_t new_witch_resource;
+  if (DEMO_MODE) {
+    conditions = demo_conditions[demo_index];
+    temperature = demo_temps[demo_index];
+  }
   uint32_t *witches = needs_umbrella(conditions) ? RAINY_WITCHES : SUNNY_WITCHES;
   if (temperature >= settings.Temperature4) {
     new_witch_resource = witches[4];
@@ -134,6 +161,9 @@ static uint32_t get_witch_resource(Weather conditions, int temperature) {
 
 static uint32_t get_weather_resource(Weather conditions) {
   uint32_t new_weather_resource = 0;
+  if (DEMO_MODE) {
+    conditions = demo_conditions[demo_index];
+  }
   if (conditions == RAINY) {
     new_weather_resource = RESOURCE_ID_IMAGE_RAIN;
   } else if (conditions == SNOWY) {
@@ -145,6 +175,9 @@ static uint32_t get_weather_resource(Weather conditions) {
 }
 
 static uint32_t get_cloud_resource(Weather conditions) {
+  if (DEMO_MODE) {
+    conditions = demo_conditions[demo_index];
+  }
   uint32_t new_cloud_resource = 0;
   if (conditions == PARTLYCLOUDY) {
     new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
@@ -192,7 +225,7 @@ static void update_weather() {
     gbitmap_destroy(s_cloud_bitmap);
     s_cloud_bitmap = NULL;
   }
-  if (settings.CONDITIONS != SUNNY) {
+  if ((DEMO_MODE && demo_conditions[demo_index] != SUNNY) || (!DEMO_MODE && settings.CONDITIONS != SUNNY)) {
     s_cloud_bitmap = gbitmap_create_with_resource(get_cloud_resource(settings.CONDITIONS));
     bitmap_layer_set_bitmap(s_cloud_layer, s_cloud_bitmap);
   } else {
@@ -227,7 +260,14 @@ static void moon_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_color(ctx, GColorWhite);
   draw_ellipse(ctx, bounds, false);
   graphics_context_set_fill_color(ctx, GColorBlack);
-  if (settings.MOON_WANING) {
+
+  int moon_frac = settings.MOON_FRACILLUM;
+  bool moon_waning = settings.MOON_WANING;
+  if (DEMO_MODE) {
+    moon_frac = demo_moon_fracs[demo_index];
+    moon_waning = demo_moon_wanings[demo_index];
+  }
+  if (moon_waning) {
     graphics_fill_rect(ctx, GRect(bounds.origin.x + bounds.size.w / 2, bounds.origin.y, bounds.size.w / 2, bounds.size.h), 0, GCornerNone);
   } else {
     graphics_fill_rect(ctx, GRect(bounds.origin.x, bounds.origin.y, bounds.size.w / 2, bounds.size.h), 0, GCornerNone);
@@ -235,12 +275,12 @@ static void moon_update_proc(Layer *layer, GContext *ctx) {
 
   GPoint center = GPoint(bounds.origin.x + (bounds.size.w / 2), bounds.origin.y + (bounds.size.h / 2));
   int fracillum_width;
-  if (settings.MOON_FRACILLUM > 50) {
+  if (moon_frac > 50) {
     graphics_context_set_stroke_color(ctx, GColorWhite);
-    fracillum_width = ((settings.MOON_FRACILLUM - 50) / 50.0) * (bounds.size.w / 2 + 3);
+    fracillum_width = ((moon_frac - 50) / 50.0) * (bounds.size.w / 2 + 3);
   } else {
     graphics_context_set_stroke_color(ctx, GColorBlack);
-    fracillum_width = (1 - (settings.MOON_FRACILLUM / 50.0)) * (bounds.size.w / 2 + 3);
+    fracillum_width = (1 - (moon_frac / 50.0)) * (bounds.size.w / 2 + 3);
   }
   if (fracillum_width > FRACILLUM_MAX_WIDTH) {
     fracillum_width = bounds.size.w / 2;
@@ -805,6 +845,9 @@ static void main_window_unload(Window *window) {
 // }
 
 static void init() {
+  if (DEMO_MODE) {
+    demo_index = rand() % num_demos;
+  }
   load_settings();
 
   // setup window
