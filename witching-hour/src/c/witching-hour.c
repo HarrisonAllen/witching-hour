@@ -35,8 +35,10 @@ static int16_t cloud_offset_y;
 static int16_t weather_offset_y;
 static int weather_tick;
 static bool queue_screen_refresh;
-int new_moon_frac = -1;
-bool new_moon_waning;
+static int new_moon_frac = -1;
+static bool new_moon_waning;
+static int qv_y_offset;
+static int start_qv_y_offset, end_qv_y_offset;
 
 // Demo mode!
 #define DEMO_MODE false
@@ -174,8 +176,6 @@ static uint32_t get_cloud_resource(Weather conditions) {
 }
 
 static void update_weather() {
-  uint32_t new_cloud_resource = RESOURCE_ID_IMAGE_CLOUDS_PARTLY;
-
   layer_set_hidden(bitmap_layer_get_layer(s_umbrella_layer), !needs_umbrella(settings.CONDITIONS));
 
   // Conditions (body)
@@ -292,7 +292,7 @@ static void update_moon() {
 static void set_witch_group_member_position(BitmapLayer *layer, int base_x, int base_y) {
   GRect og_bounds, new_bounds;
   og_bounds = layer_get_bounds(bitmap_layer_get_layer(layer));
-  new_bounds = GRect(base_x + X_OFFSET + fly_offset_x, base_y + Y_OFFSET + float_offset_y, og_bounds.size.w, og_bounds.size.h);
+  new_bounds = GRect(base_x + X_OFFSET + fly_offset_x, base_y + Y_OFFSET + float_offset_y + qv_y_offset, og_bounds.size.w, og_bounds.size.h);
   layer_set_frame(bitmap_layer_get_layer(layer), new_bounds);
 }
 
@@ -306,19 +306,41 @@ static void set_witch_group_position() {
 
 static void set_weather_group_position() {
   GRect og_bounds, new_bounds;
+  // stars
+  og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_stars_layer));
+  new_bounds = GRect(STARS_X + X_OFFSET, STARS_Y + Y_OFFSET + qv_y_offset, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(bitmap_layer_get_layer(s_cloud_layer), new_bounds);
   // cloud
   og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_cloud_layer));
-  new_bounds = GRect(CLOUDS_X + X_OFFSET, CLOUDS_Y + Y_OFFSET + cloud_offset_y, og_bounds.size.w, og_bounds.size.h);
+  new_bounds = GRect(CLOUDS_X + X_OFFSET, CLOUDS_Y + Y_OFFSET + qv_y_offset + cloud_offset_y, og_bounds.size.w, og_bounds.size.h);
   layer_set_frame(bitmap_layer_get_layer(s_cloud_layer), new_bounds);
   // moon
   og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_moon_bm_layer));
-  new_bounds = GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET + cloud_offset_y, og_bounds.size.w, og_bounds.size.h);
+  new_bounds = GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET + qv_y_offset + cloud_offset_y, og_bounds.size.w, og_bounds.size.h);
   layer_set_frame(bitmap_layer_get_layer(s_moon_bm_layer), new_bounds);
   layer_set_frame(s_moon_layer, new_bounds);
   // weather
   og_bounds = layer_get_bounds(bitmap_layer_get_layer(s_weather_layer));
-  new_bounds = GRect(WEATHER_X + X_OFFSET, WEATHER_Y + Y_OFFSET + weather_offset_y, og_bounds.size.w, og_bounds.size.h);
+  new_bounds = GRect(WEATHER_X + X_OFFSET, WEATHER_Y + Y_OFFSET + qv_y_offset + weather_offset_y, og_bounds.size.w, og_bounds.size.h);
   layer_set_frame(bitmap_layer_get_layer(s_weather_layer), new_bounds);
+}
+
+static void set_text_group_position() {
+  GRect og_bounds, new_bounds;
+  // Time
+  og_bounds = layer_get_bounds(text_layer_get_layer(s_time_layer));
+  new_bounds = GRect(TIME_X, TIME_Y + Y_OFFSET + qv_y_offset, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(text_layer_get_layer(s_time_layer), new_bounds);
+  // Date
+  og_bounds = layer_get_bounds(text_layer_get_layer(s_date_layer));
+  new_bounds = GRect(DATE_X, DATE_Y + Y_OFFSET + qv_y_offset, og_bounds.size.w, og_bounds.size.h);
+  layer_set_frame(text_layer_get_layer(s_date_layer), new_bounds);
+}
+
+static void set_all_position() {
+  set_witch_group_position();
+  set_weather_group_position();
+  set_text_group_position();
 }
 
 static bool is_witch_flying() {
@@ -472,6 +494,35 @@ static void animation_step(void *context) {
       queue_screen_refresh = false;
     }
   }
+}
+
+static void qv_will_change(GRect unob_bounds, void *context) {
+  GRect full_bounds = layer_get_bounds(window_get_root_layer(s_main_window));
+  int old_height = full_bounds.size.h;
+  int new_height = unob_bounds.size.h;
+  if (new_height == old_height) {
+    start_qv_y_offset = qv_y_offset;
+    end_qv_y_offset = 0;
+  } else {
+    start_qv_y_offset = 0;
+    end_qv_y_offset = new_height - old_height;
+  }
+  set_all_position();
+}
+
+static void qv_change(AnimationProgress progress, void *context) {
+  qv_y_offset = lerp(start_qv_y_offset, end_qv_y_offset, (((int)progress * 100) / ANIMATION_NORMALIZED_MAX)/100.0);
+  set_all_position();
+}
+
+static void qv_did_change(void *context) {
+  qv_y_offset = end_qv_y_offset;
+  set_all_position();
+}
+
+static void qv_set_to_end(GRect unob_bounds, void *context) {
+  qv_will_change(unob_bounds, NULL);
+  qv_did_change(NULL);
 }
 
 static void default_settings() {  
@@ -738,8 +789,11 @@ static void main_window_load(Window *window) {
   s_umbrella_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_UMBRELLA);
   bitmap_layer_set_bitmap(s_umbrella_layer, s_umbrella_bitmap);
   bitmap_layer_set_compositing_mode(s_umbrella_layer, GCompOpSet);
-  
 
+  // And account for preexisting quickview
+  GRect unob_bounds = layer_get_unobstructed_bounds(window_layer);
+  qv_set_to_end(unob_bounds, NULL);
+  
   layer_add_child(window_layer, bitmap_layer_get_layer(s_stars_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_weather_layer));
   layer_add_child(window_layer, bitmap_layer_get_layer(s_moon_bm_layer));
@@ -850,6 +904,14 @@ static void init() {
   window_set_background_color(s_main_window, GColorBlack);
 
   window_stack_push(s_main_window, true);
+
+  UnobstructedAreaHandlers handlers = {
+    .will_change = qv_will_change,
+    .change = qv_change,
+    .did_change = qv_did_change
+  };
+  unobstructed_area_service_subscribe(handlers, NULL);
+  
 
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
   update_time();
