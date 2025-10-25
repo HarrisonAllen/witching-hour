@@ -48,17 +48,6 @@ static int demo_moon_fracs[] = {25, 0, 100, 75};
 static int demo_moon_wanings[] = {true, false, true, false};
 static int batteries[] = {70, 0, 20, 200};
 
-static void temp_update_moon(time_t temp) {
-  if (((temp / 20) % 2) == 1) {
-    settings.MOON_FRACILLUM = 100-(temp % 20) * 5;
-    settings.MOON_WANING = true;
-  } else {
-    settings.MOON_FRACILLUM = (temp % 20) * 5;
-    settings.MOON_WANING = false;
-  }
-  layer_mark_dirty(s_moon_layer);
-}
-
 static void update_time() {
   static char s_time_buffer[8];
   static char s_date_buffer[12];
@@ -72,9 +61,6 @@ static void update_time() {
   } else {
     strftime(s_date_buffer, sizeof(s_date_buffer), "%a %d %b", tick_time);
   }
-
-  // temp_update_moon(temp);
-  // snprintf(s_time_buffer, sizeof(s_time_buffer), "%d:%d", settings.MOON_FRACILLUM, settings.MOON_WANING ? 1 : 0);
 
   text_layer_set_text(s_time_layer, s_time_buffer);
   text_layer_set_text(s_date_layer, s_date_buffer);
@@ -542,6 +528,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   uint32_t old_cloud_resource = get_cloud_resource(settings.CONDITIONS);
   uint32_t old_body_resource = get_body_resource(settings.CONDITIONS);
   uint32_t old_witch_resource = get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE);
+  bool new_temp_metric = settings.TemperatureMetric;
 
   // Current temperature and weather conditions
   Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
@@ -596,7 +583,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   // Celsius or Fahrenheit?
   Tuple *temperature_metric_t = dict_find(iterator, MESSAGE_KEY_TemperatureMetric);
   if(temperature_metric_t) {
-    settings.TemperatureMetric = temperature_metric_t->value->int32 == 1;
+    new_temp_metric = temperature_metric_t->value->int32 == 1;
   }
 
   // Cold temperature
@@ -636,7 +623,9 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
                       || old_body_resource != get_body_resource(settings.CONDITIONS)
                       || old_witch_resource != get_witch_resource(settings.CONDITIONS, settings.TEMPERATURE)
                       || (settings.MOON_FRACILLUM != new_moon_frac && new_moon_frac != -1)
-                      || settings.MOON_WANING != new_moon_waning;
+                      || settings.MOON_WANING != new_moon_waning
+                      || settings.TemperatureMetric != new_temp_metric;
+  settings.TemperatureMetric = new_temp_metric;
   if (trigger_animation) {
     queue_screen_refresh = true;
     start_witch_animation();

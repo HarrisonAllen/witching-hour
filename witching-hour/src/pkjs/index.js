@@ -184,7 +184,7 @@ Pebble.addEventListener('appmessage',
 		var dict = e.payload;
 
 		if ('TemperatureMetric' in dict) // use celsius/fahrenheit
-			metric = dict['TemperatureMetric'] == 1;
+			use_metric = dict['TemperatureMetric'] == 1;
 		if ('UseCurrentLocation' in dict) // use current location
 			use_current_location = dict['UseCurrentLocation'] == 1;
 		if ('Latitude' in dict) // latitude if not using current location
