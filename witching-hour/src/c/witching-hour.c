@@ -892,6 +892,7 @@ static void init() {
     demo_index = rand() % num_demos;
   }
   load_settings();
+  fly_offset_x = FLY_IN_CURVE_1[0];
 
   // setup window
   s_main_window = window_create();
