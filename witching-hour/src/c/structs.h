@@ -39,6 +39,7 @@ typedef struct ClaySettings {
   int WeatherCheckRate;              // how often to check weather
   bool AmericanDate;                 // use American date format (Fri Oct 31)?
   bool VibrateOnDisc;                // vibrate on bluetooth disconnect?
+  bool DisableAnim;                  // Disable animations?
   // Temperature Settings
   bool TemperatureMetric;          // Celsius or Fahrenheit?
   int Temperature1;                // Cold temperature

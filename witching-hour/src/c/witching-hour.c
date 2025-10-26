@@ -405,7 +405,28 @@ static void start_weather_animation() {
 
 static void request_weather();
 
+static void single_frame_update() {
+  weather_offset_y = 0;
+  cloud_offset_y = 0;
+  fly_offset_x = 0;
+  float_offset_y = 0;
+  weather_state = ON_SCREEN;
+  fly_state = ON_SCREEN;
+  update_weather();
+  update_moon();
+  set_witch_group_position();
+  set_weather_group_position();
+  if (weather_stale) {
+    request_weather();
+  }
+  queue_screen_refresh = false;
+}
+
 static void animation_step(void *context) {
+  if (settings.DisableAnim) {
+    single_frame_update();
+    return;
+  }
   // Handle weather
   if (weather_state == FLYING_OUT) {
     weather_offset_y = WEATHER_OUT_CURVE[weather_tick];
@@ -537,6 +558,7 @@ static void default_settings() {
   strcpy(settings.Longitude, "-71.1");     // MIT longitude
   settings.AmericanDate = true;           // Fri Oct 31 by default
   settings.VibrateOnDisc = true;          // vibrate by default
+  settings.DisableAnim = false;          // vibrate by default
   
   settings.TemperatureMetric = false;        // Celsius or Fahrenheit?
   settings.Temperature1 = 40;                // Cold temperature
@@ -667,6 +689,11 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     settings.VibrateOnDisc = vibrate_on_disc_t->value->int32 == 1;
   }
 
+  // Disable animations
+  Tuple *disable_anim_t = dict_find(iterator, MESSAGE_KEY_DisableAnim);
+  if(disable_anim_t) {
+    settings.DisableAnim = disable_anim_t->value->int32 == 1;
+  }
 
   update_time();
   trigger_animation = old_weather_resource != get_weather_resource(settings.CONDITIONS)
@@ -919,7 +946,11 @@ static void init() {
   update_weather();
   update_moon();
 
-  start_weather_animation();
+  if (settings.DisableAnim) {
+    single_frame_update();
+  } else {
+    start_weather_animation();
+  }
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
