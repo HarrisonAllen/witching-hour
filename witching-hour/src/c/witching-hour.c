@@ -703,6 +703,13 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
                       || (settings.MOON_FRACILLUM != new_moon_frac && new_moon_frac != -1)
                       || settings.MOON_WANING != new_moon_waning
                       || settings.TemperatureMetric != new_temp_metric;
+  if (settings.TemperatureMetric != new_temp_metric) {
+    if (new_temp_metric) { // if new is metric, then f -> c
+      settings.TEMPERATURE = (int)f_to_c(settings.TEMPERATURE);
+    } else { // if new is not metric, then c -> f
+      settings.TEMPERATURE = (int)c_to_f(settings.TEMPERATURE);
+    }
+  }
   settings.TemperatureMetric = new_temp_metric;
   if (trigger_animation) {
     queue_screen_refresh = true;
