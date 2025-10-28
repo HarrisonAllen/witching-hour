@@ -765,7 +765,6 @@ static void main_window_load(Window *window) {
   s_moon_bm_layer = bitmap_layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, 34, 33));
   s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PUMPKIN_MOON);
   bitmap_layer_set_bitmap(s_moon_bm_layer, s_moon_bitmap);
-  bitmap_layer_set_compositing_mode(s_moon_bm_layer, GCompOpSet);
   layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), true);
 
   // real moon: 73, 19
@@ -804,7 +803,6 @@ static void main_window_load(Window *window) {
   s_body_layer = bitmap_layer_create(GRect(FLY_START_X + BODY_X + X_OFFSET, BODY_Y + Y_OFFSET, 37, 47));
   s_body_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA);
   bitmap_layer_set_bitmap(s_body_layer, s_body_bitmap);
-  bitmap_layer_set_compositing_mode(s_body_layer, GCompOpSet);
 
   // Witch: 67, 70
   s_witch_layer = bitmap_layer_create(GRect(FLY_START_X + WITCH_X + X_OFFSET, WITCH_Y + Y_OFFSET, 37, 47));
@@ -816,7 +814,6 @@ static void main_window_load(Window *window) {
   s_cat_layer = bitmap_layer_create(GRect(FLY_START_X + CAT_X + X_OFFSET, CAT_Y + Y_OFFSET, 22, 14));
   s_cat_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_CAT_LOAFING);
   bitmap_layer_set_bitmap(s_cat_layer, s_cat_bitmap);
-  bitmap_layer_set_compositing_mode(s_cat_layer, GCompOpSet);
 
   // umbrella: 74, 63
   s_umbrella_layer = bitmap_layer_create(GRect(FLY_START_X + UMBRELLA_X + X_OFFSET, UMBRELLA_Y + Y_OFFSET, 52, 35));
