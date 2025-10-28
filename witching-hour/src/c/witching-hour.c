@@ -765,10 +765,10 @@ static void main_window_load(Window *window) {
   s_moon_bm_layer = bitmap_layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, 34, 33));
   s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PUMPKIN_MOON);
   bitmap_layer_set_bitmap(s_moon_bm_layer, s_moon_bitmap);
+  bitmap_layer_set_compositing_mode(s_moon_bm_layer, GCompOpSet);
   layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), true);
 
   // real moon: 73, 19
-  bitmap_layer_set_compositing_mode(s_moon_bm_layer, GCompOpSet);
   s_moon_layer = layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, MOON_SIZE, MOON_SIZE));
   layer_set_update_proc(s_moon_layer, moon_update_proc);
 
@@ -973,9 +973,8 @@ static void init() {
   app_message_register_outbox_sent(outbox_sent_callback);
 
   // Open AppMessage
-  const int inbox_size = 1024; // maaaaybe overkill, but 128 isn't enough
-  const int outbox_size = 1024;
-  app_message_open(inbox_size, outbox_size);
+  const int inbox_size = 128;
+  const int outbox_size = 64;
 }
 
 static void deinit() {

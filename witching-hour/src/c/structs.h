@@ -1,7 +1,7 @@
 #include <pebble.h>
 #pragma once
 
-#define MAX_CHARS 40
+#define MAX_CHARS 10
 
 // Enums
 typedef enum weather {

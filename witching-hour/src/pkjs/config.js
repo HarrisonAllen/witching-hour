@@ -130,6 +130,20 @@ module.exports = [
       ]
     },
     {
+      "type": "section",
+      "items": [
+        {
+          "type": "heading",
+          "defaultValue": "Disable Animations"
+        },
+        {
+          "type": "toggle",
+          "messageKey": "DisableAnim",
+          "defaultValue": false
+        }
+      ]
+    },
+    {
         "type": "submit",
         "defaultValue": "Submit"
     }
