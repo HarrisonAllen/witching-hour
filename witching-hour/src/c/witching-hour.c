@@ -50,6 +50,37 @@ static int demo_moon_fracs[] = {25, 0, 100, 75};
 static int demo_moon_wanings[] = {true, false, true, false};
 static int batteries[] = {70, 0, 20, 200};
 
+static void default_settings() {  
+  settings.TEMPERATURE = 80;              // placeholder temperature
+  settings.CONDITIONS = RAINY;           // placeholder weather
+  settings.MOON_FRACILLUM = 30;          // placeholder fracillum
+  settings.MOON_WANING = true;
+
+  settings.UseCurrentLocation = true;     // use GPS for weather
+  settings.WeatherCheckRate = 15;         // check every 15 mins
+  strcpy(settings.Latitude, "42.36");     // MIT latitude
+  strcpy(settings.Longitude, "-71.1");     // MIT longitude
+  settings.AmericanDate = true;           // Fri Oct 31 by default
+  settings.VibrateOnDisc = true;          // vibrate by default
+  settings.DisableAnim = false;          // vibrate by default
+  
+  settings.TemperatureMetric = false;        // Celsius or Fahrenheit?
+  settings.Temperature1 = 40;                // Cold temperature
+  settings.Temperature2 = 60;                // Chilly temperature
+  settings.Temperature3 = 75;                // Warm temperature
+  settings.Temperature4 = 90;                // Hot temperature
+}
+
+static void load_settings() {
+  default_settings();
+  persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Settings %d, %d", settings.MOON_FRACILLUM, settings.MOON_WANING);
+}
+
+static void save_settings() {
+  persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
+}
+
 static void update_time() {
   static char s_time_buffer[8];
   static char s_date_buffer[12];
@@ -285,6 +316,7 @@ static void update_moon() {
     settings.MOON_FRACILLUM = new_moon_frac;
     settings.MOON_WANING = new_moon_waning;
     new_moon_frac = -1;
+    save_settings();
   }
   layer_mark_dirty(s_moon_layer);
 }
@@ -546,36 +578,6 @@ static void qv_set_to_end(GRect unob_bounds, void *context) {
   qv_did_change(NULL);
 }
 
-static void default_settings() {  
-  settings.TEMPERATURE = 80;              // placeholder temperature
-  settings.CONDITIONS = RAINY;           // placeholder weather
-  settings.MOON_FRACILLUM = 30;          // placeholder fracillum
-  settings.MOON_WANING = true;
-
-  settings.UseCurrentLocation = true;     // use GPS for weather
-  settings.WeatherCheckRate = 15;         // check every 15 mins
-  strcpy(settings.Latitude, "42.36");     // MIT latitude
-  strcpy(settings.Longitude, "-71.1");     // MIT longitude
-  settings.AmericanDate = true;           // Fri Oct 31 by default
-  settings.VibrateOnDisc = true;          // vibrate by default
-  settings.DisableAnim = false;          // vibrate by default
-  
-  settings.TemperatureMetric = false;        // Celsius or Fahrenheit?
-  settings.Temperature1 = 40;                // Cold temperature
-  settings.Temperature2 = 60;                // Chilly temperature
-  settings.Temperature3 = 75;                // Warm temperature
-  settings.Temperature4 = 90;                // Hot temperature
-}
-
-static void load_settings() {
-  default_settings();
-  persist_read_data(SETTINGS_KEY, &settings, sizeof(settings));
-}
-
-static void save_settings() {
-  persist_write_data(SETTINGS_KEY, &settings, sizeof(settings));
-}
-
 static void request_weather() {
   weather_stale = false;
   weather_stale_counter = 0;
@@ -735,6 +737,11 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
+  if (DEMO_MODE) {
+    demo_index = rand() % num_demos;
+    queue_screen_refresh = true;
+    start_witch_animation();
+  }
   update_time();
   weather_stale_counter++;
   if (weather_stale_counter > settings.WeatherCheckRate) {
@@ -752,17 +759,17 @@ static void main_window_load(Window *window) {
   GRect bounds = layer_get_bounds(window_layer);
   
   // stars: 0, 0
-  s_stars_layer = bitmap_layer_create(GRect(STARS_X + X_OFFSET, STARS_Y + Y_OFFSET, 180, 57));
+  s_stars_layer = bitmap_layer_create(GRect(STARS_X + X_OFFSET, STARS_Y + Y_OFFSET, STARS_W, STARS_H));
   s_stars_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_STARS);
   bitmap_layer_set_bitmap(s_stars_layer, s_stars_bitmap);
   
   // weather: 0, 48
-  s_weather_layer = bitmap_layer_create(GRect(WEATHER_X + X_OFFSET, WEATHER_Y + Y_OFFSET, 180, 132));
+  s_weather_layer = bitmap_layer_create(GRect(WEATHER_X + X_OFFSET, WEATHER_Y + Y_OFFSET, WEATHER_W, WEATHER_H));
   s_weather_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_RAIN);
   bitmap_layer_set_bitmap(s_weather_layer, s_weather_bitmap);
   
   // pumpkin moon: 73, 19
-  s_moon_bm_layer = bitmap_layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, 34, 33));
+  s_moon_bm_layer = bitmap_layer_create(GRect(MOON_X + X_OFFSET, MOON_Y + Y_OFFSET, MOON_W, MOON_H));
   s_moon_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_PUMPKIN_MOON);
   bitmap_layer_set_bitmap(s_moon_bm_layer, s_moon_bitmap);
   layer_set_hidden(bitmap_layer_get_layer(s_moon_bm_layer), true);
@@ -772,51 +779,51 @@ static void main_window_load(Window *window) {
   layer_set_update_proc(s_moon_layer, moon_update_proc);
 
   // clouds: 0, 0
-  s_cloud_layer = bitmap_layer_create(GRect(CLOUDS_X + X_OFFSET, CLOUDS_Y + Y_OFFSET, 180, 57));
+  s_cloud_layer = bitmap_layer_create(GRect(CLOUDS_X + X_OFFSET, CLOUDS_Y + Y_OFFSET, CLOUDS_W, CLOUDS_H));
   s_cloud_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_CLOUDS_FULL);
   bitmap_layer_set_bitmap(s_cloud_layer, s_cloud_bitmap);
   bitmap_layer_set_compositing_mode(s_cloud_layer, GCompOpSet);
 
   // time: x, 108 ish
-  s_time_layer = text_layer_create(GRect(TIME_X, TIME_Y + Y_OFFSET, bounds.size.w, 38));
-  s_time_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_TIME_34));
+  s_time_layer = text_layer_create(GRect(TIME_X, TIME_Y + Y_OFFSET, bounds.size.w, TIME_H));
+  s_time_font = fonts_load_custom_font(resource_get_handle(TIME_FONT));
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, GColorWhite);
   text_layer_set_font(s_time_layer, s_time_font);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
   
   // date: x, 144 ish
-  s_date_layer = text_layer_create(GRect(DATE_X, DATE_Y + Y_OFFSET, bounds.size.w, 24));
-  s_date_font = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_DATE_20));
+  s_date_layer = text_layer_create(GRect(DATE_X, DATE_Y + Y_OFFSET, bounds.size.w, DATE_H));
+  s_date_font = fonts_load_custom_font(resource_get_handle(DATE_FONT));
   text_layer_set_background_color(s_date_layer, GColorClear);
   text_layer_set_text_color(s_date_layer, GColorWhite);
   text_layer_set_font(s_date_layer, s_date_font);
   text_layer_set_text_alignment(s_date_layer, GTextAlignmentCenter);
   
   // broom: 50, 66
-  s_broom_layer = bitmap_layer_create(GRect(FLY_START_X + BROOM_X + X_OFFSET, BROOM_Y + Y_OFFSET, 81, 52));
+  s_broom_layer = bitmap_layer_create(GRect(FLY_START_X + BROOM_X + X_OFFSET, BROOM_Y + Y_OFFSET, BROOM_W, BROOM_H));
   s_broom_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_BROOM);
   bitmap_layer_set_bitmap(s_broom_layer, s_broom_bitmap);
   bitmap_layer_set_compositing_mode(s_broom_layer, GCompOpSet);
 
   // Body: 67, 70
-  s_body_layer = bitmap_layer_create(GRect(FLY_START_X + BODY_X + X_OFFSET, BODY_Y + Y_OFFSET, 37, 47));
+  s_body_layer = bitmap_layer_create(GRect(FLY_START_X + BODY_X + X_OFFSET, BODY_Y + Y_OFFSET, BODY_W, BODY_H));
   s_body_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_BODY_UMBRELLA);
   bitmap_layer_set_bitmap(s_body_layer, s_body_bitmap);
 
   // Witch: 67, 70
-  s_witch_layer = bitmap_layer_create(GRect(FLY_START_X + WITCH_X + X_OFFSET, WITCH_Y + Y_OFFSET, 37, 47));
+  s_witch_layer = bitmap_layer_create(GRect(FLY_START_X + WITCH_X + X_OFFSET, WITCH_Y + Y_OFFSET, WITCH_W, WITCH_H));
   s_witch_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_WITCH_WARM_UMBRELLA);
   bitmap_layer_set_bitmap(s_witch_layer, s_witch_bitmap);
   bitmap_layer_set_compositing_mode(s_witch_layer, GCompOpSet);
   
   // Cat: 102, 89
-  s_cat_layer = bitmap_layer_create(GRect(FLY_START_X + CAT_X + X_OFFSET, CAT_Y + Y_OFFSET, 22, 14));
+  s_cat_layer = bitmap_layer_create(GRect(FLY_START_X + CAT_X + X_OFFSET, CAT_Y + Y_OFFSET, CAT_W, CAT_H));
   s_cat_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_CAT_LOAFING);
   bitmap_layer_set_bitmap(s_cat_layer, s_cat_bitmap);
 
   // umbrella: 74, 63
-  s_umbrella_layer = bitmap_layer_create(GRect(FLY_START_X + UMBRELLA_X + X_OFFSET, UMBRELLA_Y + Y_OFFSET, 52, 35));
+  s_umbrella_layer = bitmap_layer_create(GRect(FLY_START_X + UMBRELLA_X + X_OFFSET, UMBRELLA_Y + Y_OFFSET, UMBRELLA_W, UMBRELLA_H));
   s_umbrella_bitmap = gbitmap_create_with_resource(RESOURCE_ID_IMAGE_UMBRELLA);
   bitmap_layer_set_bitmap(s_umbrella_layer, s_umbrella_bitmap);
   bitmap_layer_set_compositing_mode(s_umbrella_layer, GCompOpSet);
@@ -972,6 +979,7 @@ static void init() {
   // Open AppMessage
   const int inbox_size = 128;
   const int outbox_size = 64;
+  app_message_open(inbox_size, outbox_size);
 }
 
 static void deinit() {

@@ -1,11 +1,11 @@
 {
   "name": "witching-hour",
   "author": "Harrison Allen",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "keywords": ["pebble-app"],
   "private": true,
   "dependencies": {
-    "pebble-clay": "^1.0.4"
+    "@rebble/clay": "^1.0.8"
   },
   "pebble": {
     "displayName": "Witching Hour",
@@ -17,7 +17,9 @@
       "basalt",
       "chalk",
       "diorite",
-      "emery"
+      "emery",
+      "gabbro",
+      "flint"
     ],
     "capabilities": [
       "configurable"
@@ -56,14 +58,50 @@
           "type": "font",
           "name": "FONT_DATE_20",
           "file": "fonts/ming.ttf",
-          "compatibility": "2.7"
+          "compatibility": "2.7",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "characterRegex": "[0-9ADFJMNOSTWabcdeghilnoprtuvy ]",
+          "type": "font",
+          "name": "FONT_DATE_32",
+          "file": "fonts/ming.ttf",
+          "compatibility": "2.7",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "characterRegex": "[0-9:]",
           "type": "font",
           "name": "FONT_TIME_34",
           "file": "fonts/ming.ttf",
-          "compatibility": "2.7"
+          "compatibility": "2.7",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "characterRegex": "[0-9:]",
+          "type": "font",
+          "name": "FONT_TIME_48",
+          "file": "fonts/ming.ttf",
+          "compatibility": "2.7",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "type": "bitmap",
@@ -163,12 +201,44 @@
         {
           "type": "bitmap",
           "name": "IMAGE_CLOUDS_FULL",
-          "file": "weather/clouds-full.png"
+          "file": "weather/clouds-full.png",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CLOUDS_FULL",
+          "file": "weather/clouds-full-big.png",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "type": "bitmap",
           "name": "IMAGE_CLOUDS_PARTLY",
-          "file": "weather/clouds-partly.png"
+          "file": "weather/clouds-partly.png",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_CLOUDS_PARTLY",
+          "file": "weather/clouds-partly-big.png",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "type": "bitmap",
@@ -183,22 +253,86 @@
         {
           "type": "bitmap",
           "name": "IMAGE_RAIN",
-          "file": "weather/rain.png"
+          "file": "weather/rain.png",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_RAIN",
+          "file": "weather/rain-big.png",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "type": "bitmap",
           "name": "IMAGE_SNOW",
-          "file": "weather/snow.png"
+          "file": "weather/snow.png",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_SNOW",
+          "file": "weather/snow-big.png",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "type": "bitmap",
           "name": "IMAGE_STARS",
-          "file": "weather/stars.png"
+          "file": "weather/stars.png",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_STARS",
+          "file": "weather/stars-big.png",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         },
         {
           "type": "bitmap",
           "name": "IMAGE_STORM",
-          "file": "weather/storm.png"
+          "file": "weather/storm.png",
+          "targetPlatforms": [
+            "aplite",
+            "basalt",
+            "chalk",
+            "diorite",
+            "flint"
+          ]
+        },
+        {
+          "type": "bitmap",
+          "name": "IMAGE_STORM",
+          "file": "weather/storm-big.png",
+          "targetPlatforms": [
+            "emery",
+            "gabbro"
+          ]
         }
       ]
     }

@@ -1,7 +1,3 @@
-var Clay = require('pebble-clay');
-var clayConfig = require('./config');
-var clay = new Clay(clayConfig);
-
 const WEATHER_TYPES = Object.freeze({
     clear: 0,
     partly_cloudy: 1,
@@ -44,8 +40,13 @@ const WEATHER_CODES = Object.freeze({
 
 var use_current_location = false; // use GPS
 var use_metric = false; // use celsius or fahrenheit
-var lat = '42.36'; // latitude for weather w/o GPS
-var lon = '-71.1'; // longitude for weather w/o GPS
+var lat = localStorage.getItem('lat') || '42.36'; // latitude for weather w/o GPS
+var lon = localStorage.getItem('lon') || '-71.1'; // longitude for weather w/o GPS
+
+var Clay = require('@rebble/clay');
+var clayConfig = require('./config.json');
+// Initialize Clay
+var clay = new Clay(clayConfig);
 
 // request data from url
 var xhrRequest = function (url, type, callback) {
@@ -133,17 +134,28 @@ function fetchMoon(pos) {
 }
 
 function locationSuccess(pos) {
+	if (pos) {
+		lat = pos.coords.latitude;
+		lon = pos.coords.longitude;
+		localStorage.setItem('lat', lat);
+		localStorage.setItem('lon', lon);
+	}
+	else {
+		lat = localStorage.getItem('lat');
+		lon = localStorage.getItem('lon');
+	}
+
     fetchWeather(pos);
     fetchMoon(pos);
 }
 
 function locationError(err) {
-	console.log('Error requesting location, retrying without geolocation');
-    getWeather(true);
+	console.log('Error requesting location!');
+	locationSuccess(null);
 }
 
-function getWeather(force_no_geo) {
-	if (use_current_location == true && !force_no_geo) { // if using current location
+function getWeatherAndMoon() {
+	if (use_current_location == true) { // if using current location
 		navigator.geolocation.getCurrentPosition(
 			locationSuccess,
 			locationError,
@@ -192,6 +204,11 @@ Pebble.addEventListener('appmessage',
 		if ('Longitude' in dict) // longitude if not using current location
 			lon = dict['Longitude'];
 
-		getWeather(false);
+		if (lat && lon) {
+			localStorage.setItem('lat', lat);
+			localStorage.setItem('lon', lon);
+		}
+
+		getWeatherAndMoon();
 	}
 );
