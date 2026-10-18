@@ -737,11 +737,6 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changes) {
-  if (DEMO_MODE) {
-    demo_index = rand() % num_demos;
-    queue_screen_refresh = true;
-    start_witch_animation();
-  }
   update_time();
   weather_stale_counter++;
   if (weather_stale_counter > settings.WeatherCheckRate) {
